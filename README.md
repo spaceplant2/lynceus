@@ -27,8 +27,8 @@ Lynceus is a lightweight, modern SNMP management web interface built with a **Fa
 
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with WSL 2 enabled on Windows)
-- [Git](https://git-scm.com/)
+- **Linux / macOS:** [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- **Windows:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) with the WSL 2 backend enabled- [Git](https://git-scm.com/)
 
 ### Running the Application
 

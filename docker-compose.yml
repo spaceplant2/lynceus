@@ -1,0 +1,33 @@
+---
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lynceus-backend
+    restart: always
+    ports:
+      - "8800:8000"
+    environment:
+      - PORT=8000
+    networks:
+      - lynceus-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lynceus-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - lynceus-net
+
+networks:
+  lynceus-net:
+    driver: bridge
+

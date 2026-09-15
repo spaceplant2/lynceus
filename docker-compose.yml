@@ -8,7 +8,7 @@ services:
     container_name: lynceus-backend
     restart: always
     ports:
-      - "8800:8000"
+      - "8000:8000"
     environment:
       - PORT=8000
     networks:

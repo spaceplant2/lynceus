@@ -1,0 +1,13 @@
+
+devices:
+  - id: "mock-ups-01"
+    name: "Server Room Primary UPS"
+    type: "ups"
+    protocol: "mock"
+    host: "127.0.0.1"
+
+  - id: "mock-pdu-01"
+    name: "Distribution PDU Rack A"
+    type: "pdu"
+    protocol: "mock"
+    host: "127.0.0.1"

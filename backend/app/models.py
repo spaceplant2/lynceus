@@ -1,34 +1,57 @@
+
+from enum import Enum
+from typing import Optional, List, Union, Dict, Any
 from pydantic import BaseModel, Field
-from typing import Optional, Any, List
+from datetime import datetime
 
-class SNMPGetRequest(BaseModel):
-    ip: str = Field(..., example="192.168.1.1", description="Target IP address")
-    port: int = Field(161, description="SNMP UDP port")
-    community: str = Field("public", description="SNMP v2c Community String")
-    oid: str = Field(..., example="1.3.6.1.2.1.1.1.0", description="Target OID")
+# Unified Device Types
+class DeviceType(str, Enum):
+    PDU = "pdu"
+    UPS = "ups"
+    ATS = "ats"
+    SERVER = "server"
 
-class SNMPSetRequest(BaseModel):
-    ip: str = Field(..., example="192.168.1.1")
-    port: int = Field(161)
-    community: str = Field("private", description="Requires write-enabled community string")
-    oid: str = Field(..., example="1.3.6.1.2.1.1.4.0")
-    value: Any = Field(..., description="Value to set on the device")
-    value_type: str = Field("str", example="str", description="Type: 'str' or 'int'")
+# Unified Protocols
+class ProtocolType(str, Enum):
+    SNMP = "snmp"
+    NUT = "nut"
+    REST = "rest"
+    PING = "ping"
+    MOCK = "mock"
 
-class SNMPWalkRequest(BaseModel):
-    ip: str = Field(..., example="192.168.1.1")
-    port: int = Field(161)
-    community: str = Field("public")
-    oid: str = Field("1.3.6.1.2.1", description="Base OID to walk")
+# Unified Status Enums
+class PowerStatus(str, Enum):
+    NORMAL = "NORMAL"
+    ON_BATTERY = "ON_BATTERY"
+    LOW_BATTERY = "LOW_BATTERY"
+    BYPASS = "BYPASS"
+    OVERLOAD = "OVERLOAD"
+    OFFLINE = "OFFLINE"
 
-class SNMPResultResponse(BaseModel):
-    ip: str
-    oid: str
-    value: str
-    status: str = "success"
+# Outlet Model
+class OutletStatus(BaseModel):
+    id: Union[int, str]
+    name: Optional[str] = None
+    state: str = "UNKNOWN"  # e.g., "ON", "OFF"
 
-class SNMPWalkResultResponse(BaseModel):
-    ip: str
-    base_oid: str
-    results: List[dict]
-    status: str = "success"
+# Telemetry Metrics Model
+class TelemetryMetrics(BaseModel):
+    input_voltage: Optional[float] = None
+    output_voltage: Optional[float] = None
+    output_load_percent: Optional[float] = None
+    battery_charge_percent: Optional[float] = None
+    battery_runtime_seconds: Optional[int] = None
+    current_draw_amps: Optional[float] = None
+    power_watts: Optional[float] = None
+
+# Unified Dashboard Device Response
+class DeviceTelemetryResponse(BaseModel):
+    device_id: str
+    name: str
+    device_type: DeviceType
+    protocol: ProtocolType
+    status: PowerStatus = PowerStatus.OFFLINE
+    is_reachable: bool = False
+    last_polled: Optional[datetime] = None
+    metrics: TelemetryMetrics = Field(default_factory=TelemetryMetrics)
+    outlets: List[OutletStatus] = Field(default_factory=list)

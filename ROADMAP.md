@@ -1,68 +1,60 @@
+# Lynceus — Project Roadmap & Versioning Plan
 
-# Lynceus Roadmap
+Lynceus is a modular, containerized Power Infrastructure Dashboard designed to provide a unified, protocol-agnostic view of PDUs, UPSs, and server PMCs.
 
-```
-               ┌─────────────────────────────────────────────────────────────┐
-               │              Phase 1: Foundation & Telemetry                │
-               │  • Unified Inventory File (devices.yaml)                    │
-               │  • Core Protocol Drivers (SNMP, NUT, REST API, Ping/TCP)    │
-               │  • Standardized Normalization Engine                        │
-               │  • Power Dashboard UI (PDU & UPS Visual Cards)              │
-               └──────────────────────────────┬──────────────────────────────┘
-                                              │
-                                              ▼
-               ┌─────────────────────────────────────────────────────────────┐
-               │             Phase 2: Control Loop & Configuration           │
-               │  • Outlet Control & Settings Modals (Safe Confirmation)     │
-               │  • Global App Settings (config.yaml / .env)                 │
-               │  • Nginx Proxy-Based Auth (Authelia / Basic Auth)           │
-               │  • Read-Only UI Display Toggle                              │
-               └──────────────────────────────┬──────────────────────────────┘
-                                              │
-                                              ▼
-               ┌─────────────────────────────────────────────────────────────┐
-               │             Phase 3: Quality of Life & Operations           │
-               │  • Background Polling Engine                                │
-               │  • Apprise / Mailrise Webhook & SMTP Alerts                 │
-               │  • Kiosk Mode & Auto-Refresh Controls                       │
-               │  • Rack Aggregated Power Metrics & Data Export (CSV/JSON)   │
-               └─────────────────────────────────────────────────────────────┘
+This document outlines the versioning strategy, milestone targets, and feature roadmap leading to a v1.0.0 General Availability (GA) release.
 
-```
+---
 
-# Detailed Phase Breakdown
-## Phase 1: Foundation & Unified Telemetry
-- Static Inventory File (devices.yaml)
-  - Defines target equipment (PDUs, UPSs, ATSs, Servers) along with their protocol, network parameters, and rack locations.
-- Modular Driver Architecture (app/drivers/)
-  - SNMP Driver: Handles OID gets/walks using vendor presets (APC, Eaton, CyberPower, Tripp Lite).
-  - NUT Driver: Connects over TCP (3493) to query upsd / PyNUT telemetry.
-  - REST Driver: Queries modern smart PDU HTTP endpoints (httpx).
-  - Ping / TCP Check Driver: Rapid ICMP/socket reachability polling to flag offline devices instantly.
-- Data Normalization Engine
-  - Maps raw outputs from all 4 protocols into a standard JSON payload (status, input_voltage, output_load_percent, battery_charge_percent, outlet_states).
-- Power Dashboard Cards (React)
-  - Grid view featuring visual gauges, battery progress bars, load meters, and outlet status badges.
+## 📌 Versioning Strategy
 
-## Phase 2: Control, Safety & Security
-- Outlet & Parameter Control Modals
-  - Send SET commands over SNMP/REST or control flags over NUT to toggle/reboot individual PDU outlets or clear alarm states.
-  - Includes explicit double-confirmation prompts to prevent accidental power drops.
-- Global App Configuration (config.yaml)
-  - Configures global polling intervals, timeout thresholds, and application defaults via an external mounted file.
-- Low-Overhead Proxy Authentication
-  - Configures Nginx reverse-proxy snippets for seamless integration with Authelia, OAuth2-Proxy, or Nginx Basic Auth without custom user database code.
-- Read-Only UI Mode Switch
-  - Disables control actions globally for status displays or wall-mounted dashboards.
+Lynceus follows [Semantic Versioning 2.0.0](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 
-## Phase 3: Operations, Alerts & Quality of Life
-- Async Background Polling (APScheduler / asyncio)
-  - Polls all inventory items in the background on set intervals to track uptime and threshold states.
-- Notification Engine (Apprise / Mailrise Integration)
-  - Fires HTTP POST payloads to Apprise or routes standard email triggers through Mailrise when a threshold breach occurs (UPS_ONBATT, PDU_OVERLOAD, DEVICE_OFFLINE).
-- Kiosk / TV Display Mode
-  - Full-screen auto-rotating view with customizable refresh rates designed for NOC/rack monitors.
-- Aggregated Rack Power & Audit Exports
-  - Calculates total wattage/amperage drawn per rack across multiple PDUs.
-  - Provides one-click CSV/JSON snapshot downloads for capacity auditing.
+* **`0.x.y` Releases:** Initial development phase. API schema, driver abstractions, and configuration structures may evolve.
+* **Minor Version (`0.X.0`):** Introduces major functional milestones (e.g., new driver integrations, control engine, alerting).
+* **Patch Version (`0.x.Y`):** Bug fixes, security updates, and performance optimizations within a minor milestone.
+* **`1.0.0` Release:** Production-ready baseline with stable APIs, full test coverage, authentication, and security hardening.
 
+---
+
+## 🗺️ Release Milestones
+
+| Version | Milestone Name | Key Capabilities & Objectives | Status |
+| :--- | :--- | :--- | :--- |
+| **v0.1.0** | **Baseline Stack & Mock Engine** | FastAPI backend, React grid dashboard, Pydantic telemetry models, OpenAPI schema, and `devices.yaml` configuration with env variable interpolation. | **Completed** |
+| **v0.2.0** | **Core SNMP Driver & RFC 1628** | Async PySNMP 7.x driver engine, standard UPS RFC 1628 MIB queries, 2-second timeout enforcement, and graceful `OFFLINE`/`N/A` degradation. | *In Progress* |
+| **v0.3.0** | **Multi-Vendor PDU Support** | Vendor-specific MIB extensions (APC/Schneider, Eaton, TrippLite), outlet status parsing, and dynamic status badges in React UI. | Planned |
+| **v0.4.0** | **Redfish & Out-of-Band Drivers** | RESTful Redfish protocol driver for server power management controllers (Dell iDRAC, HPE iLO), expanding past network power gear. | Planned |
+| **v0.5.0** | **Control & Command Engine** | Outlet power switching (ON / OFF / REBOOT) via API and UI, backed by role-based access control (RBAC) and audit logging. | Planned |
+| **v0.6.0** | **Metrics & Alerting Core** | Time-series telemetry store (Prometheus/TimescaleDB), configurable threshold triggers (overload, on-battery, low battery), and webhook notifications. | Planned |
+| **v0.9.0** | **Release Candidate (RC)** | UI polishing, production Docker Compose environment (Nginx reverse proxy, TLS certificates, non-root user execution), and integration test suite. | Planned |
+| **v1.0.0** | **General Availability (GA)** | Production-ready release, stable OpenAPI specification, end-to-end documentation, and helm/compose deployment patterns. | Planned |
+
+---
+
+## 🛠️ Phase-by-Phase Acceptance Criteria
+
+### v0.1.0 — Baseline Stack & Mock Engine (Current Baseline)
+- [x] FastAPI server exposing `/api/devices` with OpenAPI specification (`/docs`).
+- [x] Pydantic models for normalized `PowerStatus` enums and device telemetry responses.
+- [x] Config loader parsing `devices.yaml` with `${ENV_VAR}` substitution.
+- [x] React frontend auto-refreshing grid displaying mock device telemetry.
+- [x] Containerized development stack via Docker Compose.
+
+### v0.2.0 — Core SNMP Driver & RFC 1628
+- [ ] Implement `SnmpDriver` using `pysnmp.hlapi.v3arch.asyncio`.
+- [ ] Query standard RFC 1628 UPS OIDs (Voltage, Current, Load, Battery Charge, Battery Status).
+- [ ] Implement non-blocking async execution with a strict 2-second timeout per polling loop.
+- [ ] Normalize raw SNMP integers/gauge values into standard Pydantic models.
+
+### v0.3.0 — Multi-Vendor PDU Support
+- [ ] Extend SNMP driver with driver profiles for APC, Eaton, and TrippLite MIBs.
+- [ ] Parse per-outlet states and current draw where hardware supports it.
+- [ ] Render per-outlet status badges and toggle states on `PowerCard` components.
+
+---
+
+## 📄 Related Documents
+
+* **`README.md`**: Quickstart guide and local developer setup.
+* **`CHANGELOG.md`**: Historical record of changes made in each version release.

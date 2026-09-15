@@ -15,7 +15,7 @@ from app.config import load_devices_config
 from app.models import DeviceTelemetryResponse, ProtocolType
 from app.drivers.mock import MockDriver
 
-app = FastAPI(title="Lynceus Power Hub API")
+app = FastAPI(title="Lynceus Power Hub API", version="0.2.0-dev")
 
 
 # ============================================================================

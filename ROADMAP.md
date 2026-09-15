@@ -42,15 +42,53 @@ Lynceus follows [Semantic Versioning 2.0.0](https://semver.org/) (`MAJOR.MINOR.P
 - [x] Containerized development stack via Docker Compose.
 
 ### v0.2.0 — Core SNMP Driver & RFC 1628
-- [ ] Implement `SnmpDriver` using `pysnmp.hlapi.v3arch.asyncio`.
-- [ ] Query standard RFC 1628 UPS OIDs (Voltage, Current, Load, Battery Charge, Battery Status).
-- [ ] Implement non-blocking async execution with a strict 2-second timeout per polling loop.
-- [ ] Normalize raw SNMP integers/gauge values into standard Pydantic models.
+- [x] Implement `SnmpDriver` using `pysnmp.hlapi.v3arch.asyncio`.
+- [x] Query standard RFC 1628 UPS OIDs (Voltage, Current, Load, Battery Charge, Battery Status).
+- [x] Implement non-blocking async execution with a strict 2-second timeout per polling loop.
+- [x] Normalize raw SNMP integers/gauge values into standard Pydantic models.
 
 ### v0.3.0 — Multi-Vendor PDU Support
 - [ ] Extend SNMP driver with driver profiles for APC, Eaton, and TrippLite MIBs.
 - [ ] Parse per-outlet states and current draw where hardware supports it.
 - [ ] Render per-outlet status badges and toggle states on `PowerCard` components.
+
+---
+
+## Milestone Tracker
+
+- [x] **v0.1.0 — Prototype & Baseline UI** (Completed)
+- [x] **v0.2.0 — Live SNMP Integration & Data Parity** (Completed)
+- [ ] **v0.3.0 — Multi-Vendor Profile Engine** (Planned)
+- [ ] **v0.4.0 — Historical Telemetry & Alerting** (Backlog)
+
+---
+
+## [v0.2.0] — Live SNMP Integration (Current Release)
+- **Goal:** Parity between mock data and real SNMP hardware polling.
+- **Status:** Complete ✅
+- **Key Deliverables:**
+  - Async PySNMP 7.x integration using RFC 1628 MIB OIDs.
+  - Unified `TelemetryMetrics` schema for both live and mock drivers.
+  - Robust exception handling and offline state reporting.
+
+---
+
+## [v0.3.0] — Multi-Vendor Profile Engine
+- **Goal:** Decouple protocol execution from device-specific MIB definitions.
+- **Target Features:**
+  - **YAML Profile Loader:** Externalize OID maps and scaling rules into YAML definitions (`rfc1628.yaml`, `apc_powernet.yaml`, `eaton_xups.yaml`).
+  - **Device-to-Profile Binding:** Add a `profile` attribute to `devices.json` configuration.
+  - **Dynamic Telemetry Scaling:** Apply profile-defined multiplier transformations (e.g., converting deciamps to float Amps).
+  - **SNMP Auto-Discovery / Probe:** Initial sysObjectID querying to recommend matching profiles.
+
+---
+
+## [v0.4.0] — Persistence & Real-Time Alerts
+- **Goal:** Time-series data logging and user-configurable thresholds.
+- **Target Features:**
+  - InfluxDB or TimescaleDB time-series storage backend.
+  - WebSocket telemetry streaming for sub-second UI updates.
+  - Webhook and email alert dispatch on state changes (`normal` -> `low_battery` / `offline`).
 
 ---
 

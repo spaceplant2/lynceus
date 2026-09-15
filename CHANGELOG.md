@@ -16,6 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-09-15
+
+### Added
+- **SNMP Protocol Driver (`SnmpDriver`):** Added RFC 1628 MIB support using PySNMP 7.x (`v3arch` async implementation).
+- **Asynchronous Transport Factory:** Configured `UdpTransportTarget.create()` for async UDP transport initialization.
+- **Unified Telemetry Schema:** Expanded `TelemetryMetrics` model to standardize fields across mock and live drivers (`input_voltage`, `output_voltage`, `current_draw_amps`, `output_load_percent`, `battery_charge_percent`, `power_watts`).
+- **Graceful Fault Tolerance:** Implemented `null` metric fallbacks and `offline` status handling for unroutable or timed-out devices.
+
+### Fixed
+- **PySNMP Keyword Conflicts:** Fixed positional parameter errors during `UdpTransportTarget` transport creation.
+- **Pydantic Validation Errors:** Resolved schema mismatches between backend field names and frontend metric expectations (`device_id` vs `id`).
+- **UnboundLocalError in SNMP Exception Handler:** Fixed uninitialized variable references during SNMP polling failures by explicitly passing `None` metrics.
+- **Enum Coercion:** Aligned `PowerStatus` mappings with Pydantic validation requirements across all drivers.
+
+---
+
 ## [0.1.0] - 2026-09-15
 
 ### Added
@@ -32,5 +48,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed missing `Optional` type hint import in `backend/app/config.py`.
 - Corrected Docker build configuration in `backend/Dockerfile` to copy `devices.yaml` into the root application path (`/app/devices.yaml`).
 
-[Unreleased]: https://github.com/your-org/lynceus/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/lynceus/releases/tag/v0.1.0
+[Unreleased]: https://github.com/spaceplant2/lynceus/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/spaceplant2/lynceus/releases/tag/v0.1.0

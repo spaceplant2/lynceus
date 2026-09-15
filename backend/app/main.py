@@ -1,3 +1,4 @@
+import traceback
 from fastapi import FastAPI, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
@@ -13,7 +14,7 @@ from pysnmp.proto.rfc1902 import Integer32, OctetString
 # Phase 1 Lynceus Imports
 from app.config import load_devices_config
 from app.models import DeviceTelemetryResponse, ProtocolType
-from app.drivers.mock import MockDriver
+from app.drivers import get_driver
 
 app = FastAPI(title="Lynceus Power Hub API", version="0.2.0-dev")
 
@@ -142,16 +143,19 @@ async def snmp_walk(req: SnmpRequest):
 # ============================================================================
 
 @app.get("/api/devices", response_model=List[DeviceTelemetryResponse])
-async def get_all_devices():
-    """Polls all configured devices from devices.yaml using their assigned drivers."""
-    devices_config = load_devices_config("devices.yaml")
-    results = []
+async def get_devices():
+    configs = load_devices_config()
+    telemetry_list = []
 
-    for dev in devices_config:
-        if dev.protocol == ProtocolType.MOCK:
-            driver = MockDriver(dev)
+    for config in configs:
+        try:
+            # Factory handles returning MockDriver, SnmpDriver, etc.
+            driver = get_driver(config)
             telemetry = await driver.poll()
-            results.append(telemetry)
-        # Future protocol drivers (SNMP, NUT, REST, Ping) will route here
+            telemetry_list.append(telemetry)
+        except Exception as e:
+            # Prevent single device failure from crashing endpoint
+            print(f"Error polling device {config.id}: {type(e).__name__} - {e}")
+            traceback.print_exc()
 
-    return results
+    return telemetry_list

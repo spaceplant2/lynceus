@@ -11,3 +11,9 @@ devices:
     type: "pdu"
     protocol: "mock"
     host: "127.0.0.1"
+
+  - id: "mock-pdu-02"
+    name: "Distribution PDU Rack B"
+    type: "pdu"
+    protocol: "snmp"
+    host: "127.0.0.1"

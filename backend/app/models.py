@@ -21,12 +21,12 @@ class ProtocolType(str, Enum):
 
 # Unified Status Enums
 class PowerStatus(str, Enum):
-    NORMAL = "NORMAL"
-    ON_BATTERY = "ON_BATTERY"
-    LOW_BATTERY = "LOW_BATTERY"
-    BYPASS = "BYPASS"
-    OVERLOAD = "OVERLOAD"
-    OFFLINE = "OFFLINE"
+    NORMAL = "normal"
+    ON_BATTERY = "on_battery"
+    LOW_BATTERY = "low_battery"
+    BYPASS = "bypass"
+    OVERLOAD = "overload"
+    OFFLINE = "offline"
 
 # Outlet Model
 class OutletStatus(BaseModel):

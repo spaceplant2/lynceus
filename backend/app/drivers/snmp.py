@@ -1,8 +1,9 @@
-import asyncio
 import logging
-from typing import Dict, Any
-from pysnmp.hlapi.v3arch.asyncio import (
-    get_cmd,
+from typing import Dict, Any, Optional
+
+# Stable PySNMP async imports
+from pysnmp.hlapi.asyncio import (
+    getCmd,
     SnmpEngine,
     CommunityData,
     UdpTransportTarget,
@@ -11,122 +12,136 @@ from pysnmp.hlapi.v3arch.asyncio import (
     ObjectIdentity,
 )
 
-from app.config import DeviceConfig
-from app.models import DeviceTelemetryResponse, TelemetryMetrics, PowerStatus
 from app.drivers.base import BaseDriver
+from app.models import TelemetryMetrics
+from app.profiles.loader import ProfileLoader, ProfileSchema
 
 logger = logging.getLogger("uvicorn.error")
 
 
 class SnmpDriver(BaseDriver):
     """
-    SNMP Protocol Driver implementing RFC 1628 UPS MIB querying with PySNMP 7.x.
+    SNMP driver execution engine. Dynamically loads profile schema definitions
+    and transforms raw OID values into standard TelemetryMetrics model values.
     """
 
-    OID_OUTPUT_VOLTAGE = ".1.3.6.1.2.1.33.1.4.4.1.2.1"
-    OID_OUTPUT_CURRENT = ".1.3.6.1.2.1.33.1.4.4.1.3.1"
-    OID_OUTPUT_LOAD = ".1.3.6.1.2.1.33.1.4.4.1.5.1"
-    OID_BATTERY_CHARGE = ".1.3.6.1.2.1.33.1.2.4.0"
-    OID_BATTERY_STATUS = ".1.3.6.1.2.1.33.1.2.1.0"
+    def __init__(self, config: Any):
+        # Support both dict and Pydantic DeviceConfig models
+        if hasattr(config, "model_dump"):
+            config_dict = config.model_dump()
+        elif hasattr(config, "dict"):
+            config_dict = config.dict()
+        elif isinstance(config, dict):
+            config_dict = config
+        else:
+            config_dict = vars(config)
 
-    def __init__(self, config: DeviceConfig, timeout: float = 2.0):
-        super().__init__(config)
-        self.timeout = timeout
-        self.host = self.config.host or "127.0.0.1"
-        self.port = self.config.port or 161
+        super().__init__(config_dict)
+        self.device_id: str = config_dict.get("id", "unknown-device")
+        self.host: str = config_dict.get("host", "localhost")
+        self.port: int = config_dict.get("port", 161)
+        self.community: str = config_dict.get("community", "public")
+        
+        # Load device profile (defaults to 'rfc1628_default' if not specified)
+        profile_id: str = config_dict.get("profile", "rfc1628_default")
+        self.profile: ProfileSchema = ProfileLoader.get_profile(profile_id)
+        logger.info(f"Initialized SnmpDriver for {self.host} using profile '{self.profile.id}'")
+
+    def _apply_transform(self, metric_key: str, raw_value: Any) -> Any:
+        """Applies scaling factor and type conversion defined in profile transforms."""
+        if raw_value is None:
+            return None
+
+        rule = self.profile.transforms.get(metric_key)
+        if not rule:
+            return raw_value
+
+        try:
+            val = float(raw_value) * rule.scale
+            return int(val) if rule.type == "int" else round(val, 1)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Transform failed for metric '{metric_key}' with value {raw_value}: {e}")
+            return raw_value
+
+    def _map_power_status(self, raw_status: Any) -> str:
+        """Maps raw vendor status codes to standard status strings."""
+        if self.profile.status_mapping is None or raw_status is None:
+            return "normal"
+
+        try:
+            status_code = int(raw_status)
+            mapping = self.profile.status_mapping.map
+            return mapping.get(status_code, self.profile.status_mapping.default)
+        except (ValueError, TypeError):
+            return self.profile.status_mapping.default
 
     async def _fetch_snmp_data(self) -> Dict[str, Any]:
-        snmp_engine = SnmpEngine()
-        community = CommunityData(self.config.community or "public", mpModel=1)
-        
-        # PySNMP 7.x async factory pattern with timeout and retries
-        transport = await UdpTransportTarget.create(
-            (self.host, self.port),
-            timeout=1.0,
-            retries=0
-        )
-        context = ContextData()
+        """Queries the configured SNMP device OIDs in a single request."""
+        var_binds_to_fetch = []
+        metric_keys = []
 
-        var_binds = [
-            ObjectType(ObjectIdentity(self.OID_OUTPUT_VOLTAGE)),
-            ObjectType(ObjectIdentity(self.OID_OUTPUT_CURRENT)),
-            ObjectType(ObjectIdentity(self.OID_OUTPUT_LOAD)),
-            ObjectType(ObjectIdentity(self.OID_BATTERY_CHARGE)),
-            ObjectType(ObjectIdentity(self.OID_BATTERY_STATUS)),
-        ]
+        # Build ObjectType queries for each OID in the profile schema
+        for key, oid in self.profile.oids.model_dump(exclude_none=True).items():
+            metric_keys.append(key)
+            var_binds_to_fetch.append(ObjectType(ObjectIdentity(oid)))
 
-        error_indication, error_status, error_index, var_bind_table = await get_cmd(
-            snmp_engine, community, transport, context, *var_binds
+        if not var_binds_to_fetch:
+            return {}
+
+        error_indication, error_status, error_index, var_binds = await getCmd(
+            SnmpEngine(),
+            CommunityData(self.community, mpModel=1),  # SNMP v2c
+            UdpTransportTarget((self.host, self.port), timeout=2.0, retries=1),
+            ContextData(),
+            *var_binds_to_fetch
         )
 
-        if error_indication:
-            raise ConnectionError(f"SNMP Indication Error: {error_indication}")
-        if error_status:
-            raise ConnectionError(f"SNMP Status Error: {error_status.prettyPrint()}")
+        if error_indication or error_status:
+            err_msg = error_indication or error_status.prettyPrint()
+            raise RuntimeError(f"SNMP fetch error from {self.host}: {err_msg}")
 
         results = {}
-        for var_bind in var_bind_table:
-            oid_str = str(var_bind[0])
-            val = var_bind[1]
-            try:
-                results[oid_str] = int(val)
-            except (ValueError, TypeError):
-                results[oid_str] = None
+        for key, var_bind in zip(metric_keys, var_binds):
+            _, val = var_bind
+            # Clean non-value types (NoSuchInstance/NoSuchObject) to None
+            results[key] = str(val) if val is not None and not str(val).startswith("No Such") else None
 
         return results
 
-    async def poll(self) -> DeviceTelemetryResponse:
+    async def poll(self) -> TelemetryMetrics:
+        """Polls SNMP device OIDs mapped in profile and returns TelemetryMetrics."""
         try:
-            raw_data = await asyncio.wait_for(self._fetch_snmp_data(), timeout=self.timeout)
-
-            voltage = raw_data.get(self.OID_OUTPUT_VOLTAGE)
-            raw_current = raw_data.get(self.OID_OUTPUT_CURRENT)
-            current = round(raw_current / 10.0, 1) if raw_current is not None else None
-            load = raw_data.get(self.OID_OUTPUT_LOAD)
-            battery = raw_data.get(self.OID_BATTERY_CHARGE)
-            batt_status_code = raw_data.get(self.OID_BATTERY_STATUS)
-
-            watts = round(voltage * current, 1) if (voltage and current) else None
+            raw_metrics = await self._fetch_snmp_data()
             
-            # Map RFC 1628 battery status code to PowerStatus enum
-            status = "normal"
-            if batt_status_code == 3:
-                status = "low_battery"
-            elif batt_status_code == 4:
-                status = "on_battery"
+            # Process metrics through profile transformations
+            power_status_raw = raw_metrics.get("power_status_raw")
+            mapped_status = self._map_power_status(power_status_raw)
 
-            return DeviceTelemetryResponse(
-                device_id=self.config.id,
-                name=self.config.name,
-                device_type=self.config.device_type,
-                protocol="snmp",
-                status=status,
-                metrics=TelemetryMetrics(
-                    input_voltage=voltage,
-                    output_voltage=voltage,
-                    current_draw_amps=current,
-                    output_load_percent=load,
-                    battery_charge_percent=battery,
-                    battery_runtime_seconds=None,
-                    power_watts=watts,
-                ),
-            )
+            out_volt = self._apply_transform("output_voltage", raw_metrics.get("output_voltage"))
+            curr_amps = self._apply_transform("current_draw_amps", raw_metrics.get("current_draw_amps"))
+            raw_watts = self._apply_transform("power_watts", raw_metrics.get("power_watts"))
 
-        except Exception as err:
-            logger.warning(f"SNMP poll failed for {self.config.id} ({self.host}): {err}")
-            return DeviceTelemetryResponse(
-                device_id=self.config.id,
-                name=self.config.name,
-                device_type=self.config.device_type,
-                protocol="snmp",
-                status="offline",
-                metrics=TelemetryMetrics(
-                    input_voltage=None,
-                    output_voltage=None,
-                    current_draw_amps=None,
-                    output_load_percent=None,
-                    battery_charge_percent=None,
-                    battery_runtime_seconds=None,
-                    power_watts=None,
-                ),
+            # Calculate power if watts OID wasn't explicitly returned
+            if raw_watts is None and out_volt is not None and curr_amps is not None:
+                power_watts = round(out_volt * curr_amps, 1)
+            else:
+                power_watts = raw_watts
+
+            return TelemetryMetrics(
+                device_id=self.device_id,
+                status=mapped_status,
+                input_voltage=self._apply_transform("input_voltage", raw_metrics.get("input_voltage")),
+                output_voltage=out_volt,
+                output_load_percent=self._apply_transform("output_load_percent", raw_metrics.get("output_load_percent")),
+                battery_charge_percent=self._apply_transform("battery_charge_percent", raw_metrics.get("battery_charge_percent")),
+                battery_runtime_seconds=self._apply_transform("battery_runtime_seconds", raw_metrics.get("battery_runtime_seconds")),
+                current_draw_amps=curr_amps,
+                power_watts=power_watts,
             )
+        except Exception as e:
+            logger.error(f"Failed to poll SNMP device {self.device_id} ({self.host}): {e}")
+            return TelemetryMetrics(
+                device_id=self.device_id,
+                status="offline"
+            )
+            

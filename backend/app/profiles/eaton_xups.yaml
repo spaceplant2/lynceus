@@ -1,0 +1,36 @@
+profile:
+  id: "eaton_xups"
+  name: "Eaton X-UPS MIB"
+  description: "Enterprise MIB for Eaton, Powerware, and Pulsar UPS hardware"
+  vendor: "Eaton Corporation"
+
+# OIDs under standard Eaton X-UPS subtree (.1.3.6.1.4.1.534.1)
+oids:
+  input_voltage: ".1.3.6.1.4.1.534.1.3.4.1.2.1"        # xupsInputVoltage (Phase 1)
+  output_voltage: ".1.3.6.1.4.1.534.1.4.4.1.2.1"       # xupsOutputVoltage (Phase 1)
+  current_draw_amps: ".1.3.6.1.4.1.534.1.4.4.1.3.1"   # xupsOutputCurrent (Phase 1)
+  output_load_percent: ".1.3.6.1.4.1.534.1.4.1.0"     # xupsOutputLoad
+  battery_charge_percent: ".1.3.6.1.4.1.534.1.2.1.0" # xupsBatCapacity
+  battery_runtime_seconds: ".1.3.6.1.4.1.534.1.2.2.0"# xupsBatTimeRemaining (Native Seconds)
+  power_status_raw: ".1.3.6.1.4.1.534.1.2.5.0"        # xupsBatStatus
+
+# Metric transformations
+transforms:
+  current_draw_amps:
+    scale: 0.1             # Eaton reports deciamps (e.g., 48 -> 4.8 A)
+    type: "float"
+  battery_runtime_seconds:
+    scale: 1.0             # Native seconds
+    type: "int"
+
+# Status code mappings (xupsBatStatus: 1=unknown, 2=batteryNormal, 3=batteryLow, 4=batteryDepleted)
+status_mapping:
+  target_oid: ".1.3.6.1.4.1.534.1.2.5.0"
+  default: "normal"
+  map:
+    1: "unknown"
+    2: "normal"
+    3: "low_battery"
+    4: "on_battery"
+
+    

@@ -1,54 +1,53 @@
 import os
-import re
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 import yaml
+import logging
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
+logger = logging.getLogger("uvicorn.error")
+
+CONFIG_PATH = os.getenv("DEVICES_CONFIG_PATH", "devices.yaml")
 
 class DeviceConfig(BaseModel):
     id: str
     name: str
-    device_type: str = Field(..., alias="type")  # Maps 'type' in YAML to 'device_type'
-    protocol: str
-    host: Optional[str] = None
-    community: Optional[str] = "public"
-    port: Optional[int] = 161
-    extra_params: Dict[str, Any] = Field(default_factory=dict)
+    device_type: str = "ups"
+    driver: str = "snmp"
+    profile: str = "rfc1628_default"
+    host: str = "localhost"
+    port: int = 161
+    community: str = "public"
 
-    class Config:
-        populate_by_name = True
-
-
-def interpolate_env_vars(raw_yaml: str) -> str:
-    """Replaces ${VAR_NAME} syntax in YAML with environment variable values."""
-    pattern = re.compile(r"\$\{([^}]+)\}")
-
-    def replace_match(match):
-        env_var = match.group(1)
-        return os.environ.get(env_var, "")
-
-    return pattern.sub(replace_match, raw_yaml)
+    @property
+    def protocol(self) -> str:
+        """Alias for driver to maintain backwards compatibility."""
+        return self.driver
 
 
-def load_devices_config(config_path: str = "devices.yaml") -> List[DeviceConfig]:
+class AppConfig(BaseModel):
+    """Container model for system-wide configuration."""
+    devices: List[DeviceConfig] = Field(default_factory=list)
+
+
+def load_devices_config(config_path: str = CONFIG_PATH) -> List[DeviceConfig]:
     """
-    Loads device definitions from devices.yaml located in the backend root directory.
-    Supports environment variable substitution.
+    Reads devices.yaml and returns a list of validated DeviceConfig instances.
     """
-    # Resolve file path relative to backend root directory (/app/devices.yaml inside container)
-    base_dir = Path(__file__).resolve().parent.parent
-    path = base_dir / config_path if not Path(config_path).is_absolute() else Path(config_path)
-
-    if not path.exists():
-        print(f"Warning: Configuration file not found at {path}")
+    if not os.path.exists(config_path):
+        logger.warning(f"Device configuration file not found at '{config_path}'. Returning empty list.")
         return []
 
-    with open(path, "r", encoding="utf-8") as f:
-        raw_content = f.read()
+    try:
+        with open(config_path, "r") as f:
+            raw_devices = yaml.safe_load(f) or []
 
-    interpolated_content = interpolate_env_vars(raw_content)
-    parsed_yaml = yaml.safe_load(interpolated_content) or {}
+        devices = [DeviceConfig(**device) for device in raw_devices]
+        logger.info(f"Loaded {len(devices)} device configuration(s) from '{config_path}'")
+        return devices
 
-    devices_raw = parsed_yaml.get("devices", [])
-    return [DeviceConfig(**device) for device in devices_raw]
+    except Exception as e:
+        logger.error(f"Error reading configuration from '{config_path}': {e}")
+        raise RuntimeError(f"Failed to parse '{config_path}': {e}")
+  
+# Keep alias for backwards compatibility if needed
+load_device_configs = load_devices_config

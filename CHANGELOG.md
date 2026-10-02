@@ -16,6 +16,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-10-02
+
+### Added
+- **Profile-Driven SNMP Drivers:** Implemented flexible SNMP driver abstraction via `SnmpDriver` for polling UPS and power telemetry hardware.
+- **Unified API Schemas:** Standardized Pydantic schemas across `models.py` and `/api/devices`, using `DeviceTelemetryResponse` as the main response model wrapping nested `TelemetryMetrics`.
+- **Graceful Fallbacks:** Route handlers now gracefully handle unreachable SNMP endpoints or polling timeouts by returning `status: "offline"` payloads rather than crashing the API.
+- **Integration Test Suite:** Built robust test assertions in `tests/test_devices_api.py` covering pre-configured device polling, dictionary schema verification, and offline handling with `httpx2`.
+
+### Changed
+- **Config Consolidation:** Streamlined device configurations into `config.py` to remove redundant schema declarations.
+- **Metric Definitions:** Updated `TelemetryMetrics` schema to enforce `device_id` as a required field across backend services.
+
+### Fixed
+- Fixed abstract class instantiation errors in `SnmpDriver` by correcting `poll()` method indentation and signature.
+- Corrected Pydantic model nest/wrap mismatches inside `get_devices()` endpoint.
+- Standardized Enum serialization and string unwrap logic in integration test assertions.
+
+---
+
 ## [0.2.0] - 2026-09-15
 
 ### Added

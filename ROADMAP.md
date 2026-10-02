@@ -47,18 +47,33 @@ Lynceus follows [Semantic Versioning 2.0.0](https://semver.org/) (`MAJOR.MINOR.P
 - [x] Implement non-blocking async execution with a strict 2-second timeout per polling loop.
 - [x] Normalize raw SNMP integers/gauge values into standard Pydantic models.
 
-### v0.3.0 — Multi-Vendor PDU Support
-- [ ] Extend SNMP driver with driver profiles for APC, Eaton, and TrippLite MIBs.
-- [ ] Parse per-outlet states and current draw where hardware supports it.
-- [ ] Render per-outlet status badges and toggle states on `PowerCard` components.
+## Milestone v0.3.0: SNMP Driver & Telemetry Schema Integration (COMPLETED)
+- [x] Refactor `SnmpDriver` polling and async execution loop.
+- [x] Standardize FastAPI API endpoints for `/api/devices` with `DeviceTelemetryResponse`.
+- [x] Consolidate Pydantic models across driver layer and REST routes.
+- [x] Ensure complete test suite coverage (`test_devices_api.py`) for online and fallback states.
 
+---
+
+## Milestone v0.4.0: Frontend Integration & Real-Time Dashboard (NEXT)
+- [ ] Connect React/Next.js frontend dashboard to `/api/devices` endpoints.
+- [ ] Implement SSE (Server-Sent Events) or WebSocket polling for real-time telemetry streaming.
+- [ ] Build responsive visual UI components for UPS battery levels, load percentages, and outlet states.
+- [ ] Introduce real-time alert toast notifications for device state changes (`normal` -> `offline`).
+
+---
+
+## Technical Debt & Future Enhancements
+- [ ] **pysnmp v7 Migration:** Refactor `app/drivers/snmp.py` import paths from deprecated `pysnmp-lextudio` to upstream `pysnmp>=7.x` (`pysnmp.hlapi.v3arch.asyncio`).
+- [ ] **Multi-OID Profile Matching:** Expand YAML profile definitions for broader MIB support (e.g., APC, Eaton, Tripp Lite).
+- [ ] **Database Persistence:** Add TimescaleDB or InfluxDB persistence layer for long-term telemetry metrics storage and graphing.
 ---
 
 ## Milestone Tracker
 
 - [x] **v0.1.0 — Prototype & Baseline UI** (Completed)
 - [x] **v0.2.0 — Live SNMP Integration & Data Parity** (Completed)
-- [ ] **v0.3.0 — Multi-Vendor Profile Engine** (Planned)
+- [x] **v0.3.0 — Multi-Vendor Profile Engine** (Planned)
 - [ ] **v0.4.0 — Historical Telemetry & Alerting** (Backlog)
 
 ---

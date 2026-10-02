@@ -3,11 +3,15 @@ from fastapi import FastAPI, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 
-# Standard PySNMP High-Level API Imports
-from pysnmp.hlapi.v3arch.asyncio import (
-    get_cmd, set_cmd, next_cmd,
-    SnmpEngine, CommunityData, UdpTransportTarget,
-    ContextData, ObjectType, ObjectIdentity
+# USE THIS:
+from pysnmp.hlapi.asyncio import (
+    getCmd,
+    SnmpEngine,
+    CommunityData,
+    UdpTransportTarget,
+    ContextData,
+    ObjectType,
+    ObjectIdentity,
 )
 from pysnmp.proto.rfc1902 import Integer32, OctetString
 
@@ -142,20 +146,67 @@ async def snmp_walk(req: SnmpRequest):
 # 2. Phase 1 Power Infrastructure Dashboard Routes
 # ============================================================================
 
+from datetime import datetime, timezone
+from app.models import DeviceTelemetryResponse, TelemetryMetrics
+
 @app.get("/api/devices", response_model=List[DeviceTelemetryResponse])
 async def get_devices():
     configs = load_devices_config()
-    telemetry_list = []
+    response_list = []
 
     for config in configs:
+        dev_id = getattr(config, "id", getattr(config, "device_id", "unknown-device"))
+        dev_name = getattr(config, "name", "Unknown Device")
+        dev_type = getattr(config, "device_type", "ups")
+        dev_proto = getattr(config, "driver", getattr(config, "protocol", "snmp"))
+
         try:
-            # Factory handles returning MockDriver, SnmpDriver, etc.
             driver = get_driver(config)
             telemetry = await driver.poll()
-            telemetry_list.append(telemetry)
+
+            # Fix: If driver.poll() returned a DeviceTelemetryResponse object directly
+            if isinstance(telemetry, DeviceTelemetryResponse):
+                response_list.append(telemetry)
+                continue
+
+            # If telemetry is a dict, extract or attach device_id
+            if isinstance(telemetry, dict):
+                telemetry["device_id"] = dev_id
+                telemetry = TelemetryMetrics(**telemetry)
+
+            is_online = getattr(telemetry, "status", "offline") != "offline"
+
+            response_item = DeviceTelemetryResponse(
+                device_id=dev_id,
+                name=dev_name,
+                device_type=dev_type,
+                protocol=dev_proto,
+                status=getattr(telemetry, "status", "normal"),
+                is_reachable=is_online,
+                last_polled=datetime.now(timezone.utc),
+                metrics=telemetry,
+                outlets=[],
+            )
+            response_list.append(response_item)
+
         except Exception as e:
-            # Prevent single device failure from crashing endpoint
-            print(f"Error polling device {config.id}: {type(e).__name__} - {e}")
+            print(f"Error polling device {dev_id}: {type(e).__name__} {e}")
             traceback.print_exc()
 
-    return telemetry_list
+            fallback_metrics = TelemetryMetrics(device_id=dev_id, status="offline")
+            response_list.append(
+                DeviceTelemetryResponse(
+                    device_id=dev_id,
+                    name=dev_name,
+                    device_type=dev_type,
+                    protocol=dev_proto,
+                    status="offline",
+                    is_reachable=False,
+                    last_polled=datetime.now(timezone.utc),
+                    metrics=fallback_metrics,
+                    outlets=[],
+                )
+            )
+
+    return response_list
+    

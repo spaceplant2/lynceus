@@ -34,8 +34,11 @@ class OutletStatus(BaseModel):
     name: Optional[str] = None
     state: str = "UNKNOWN"  # e.g., "ON", "OFF"
 
+
 # Telemetry Metrics Model
 class TelemetryMetrics(BaseModel):
+    device_id: str = ""  # Default prevents default_factory failures
+    status: str = "normal"
     input_voltage: Optional[float] = None
     output_voltage: Optional[float] = None
     output_load_percent: Optional[float] = None
@@ -46,12 +49,14 @@ class TelemetryMetrics(BaseModel):
 
 # Unified Dashboard Device Response
 class DeviceTelemetryResponse(BaseModel):
-    device_id: str
-    name: str
-    device_type: DeviceType
-    protocol: ProtocolType
+    device_id: str =""
+    name: str = "normal"
+    device_type: DeviceType = None
+    protocol: ProtocolType = None
     status: PowerStatus = PowerStatus.OFFLINE
     is_reachable: bool = False
     last_polled: Optional[datetime] = None
     metrics: TelemetryMetrics = Field(default_factory=TelemetryMetrics)
     outlets: List[OutletStatus] = Field(default_factory=list)
+
+

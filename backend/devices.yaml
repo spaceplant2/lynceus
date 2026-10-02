@@ -1,19 +1,43 @@
+# Unified System Device Registry (v0.3.0)
 
-devices:
-  - id: "mock-ups-01"
-    name: "Server Room Primary UPS"
-    type: "ups"
-    protocol: "mock"
-    host: "127.0.0.1"
+- id: "mock-ups-01"
+  name: "Server Room Primary UPS (Mock)"
+  device_type: "ups"
+  driver: "mock"
+  # Mock driver falls back to rfc1628_default if unassigned
 
-  - id: "mock-pdu-01"
-    name: "Distribution PDU Rack A"
-    type: "pdu"
-    protocol: "mock"
-    host: "127.0.0.1"
+- id: "snmp-ups-apc"
+  name: "IDF APC Smart-UPS 3000"
+  device_type: "ups"
+  driver: "snmp"
+  host: "192.168.1.50"
+  port: 161
+  community: "public"
+  profile: "apc_powernet"
 
-  - id: "mock-pdu-02"
-    name: "Distribution PDU Rack B"
-    type: "pdu"
-    protocol: "snmp"
-    host: "127.0.0.1"
+- id: "snmp-ups-eaton"
+  name: "IDF 2 Eaton 9PX"
+  device_type: "ups"
+  driver: "snmp"
+  host: "192.168.1.60"
+  port: 161
+  community: "public"
+  profile: "eaton_xups"
+
+- id: "snmp-ups-cyberpower"
+  name: "Rack A CyberPower OR1500"
+  device_type: "ups"
+  driver: "snmp"
+  host: "192.168.1.70"
+  port: 161
+  community: "public"
+  profile: "cyberpower"
+
+- id: "snmp-ups-generic"
+  name: "Rack B Backup UPS (Standard MIB)"
+  device_type: "ups"
+  driver: "snmp"
+  host: "192.168.1.51"
+  port: 161
+  community: "public"
+  profile: "rfc1628_default"

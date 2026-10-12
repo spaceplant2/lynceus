@@ -34,5 +34,7 @@ Lynceus is a lightweight, modern SNMP management web interface built with a **Fa
 
 1. **Clone the Repository:**
    ```bash
-   git clone [https://github.com/spaceplant2/lynceus.git](https://github.com/spaceplant2/lynceus.git)
+   git clone https://github.com/spaceplant2/lynceus.git
    cd lynceus
+   ```
+   

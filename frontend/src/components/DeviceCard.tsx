@@ -1,4 +1,3 @@
-// frontend/src/components/DeviceCard.tsx
 'use client';
 
 import React, { useState } from 'react';

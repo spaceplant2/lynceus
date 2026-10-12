@@ -1,4 +1,3 @@
-# backend/app/main.py
 import asyncio
 import json
 from fastapi import FastAPI, BackgroundTasks

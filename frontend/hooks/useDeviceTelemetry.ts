@@ -1,4 +1,3 @@
-// frontend/hooks/useDeviceTelemetry.ts
 import { useEffect, useState, useRef, useCallback } from 'react';
 
 export interface TelemetryMetrics {

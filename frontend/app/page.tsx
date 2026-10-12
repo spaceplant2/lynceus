@@ -1,4 +1,3 @@
-// frontend/app/page.tsx
 import DeviceDashboard from '@/components/DeviceDashboard';
 
 export default function Page() {

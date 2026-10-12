@@ -1,4 +1,3 @@
-# backend/app/poller.py
 import asyncio
 import time
 from pathlib import Path

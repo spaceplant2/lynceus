@@ -1,212 +1,56 @@
-import traceback
-from fastapi import FastAPI, HTTPException
-from typing import List, Optional
-from pydantic import BaseModel
+# backend/app/main.py
+import asyncio
+import json
+from fastapi import FastAPI, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
 
-# USE THIS:
-from pysnmp.hlapi.asyncio import (
-    getCmd,
-    SnmpEngine,
-    CommunityData,
-    UdpTransportTarget,
-    ContextData,
-    ObjectType,
-    ObjectIdentity,
+from app.config import settings, profile_manager, load_targets
+from app.poller import SNMPPoller
+
+# 1. MUST BE FIRST: Instantiate FastAPI app before any decorators (@app.get) reference it
+app = FastAPI(title=settings.app_name, debug=settings.debug)
+
+# CORS configuration for Next.js frontend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-from pysnmp.proto.rfc1902 import Integer32, OctetString
 
-# Phase 1 Lynceus Imports
-from app.config import load_devices_config
-from app.models import DeviceTelemetryResponse, ProtocolType
-from app.drivers import get_driver
+# Initialize the SNMP poller service
+poller = SNMPPoller(targets_path=settings.targets_file, profile_manager=profile_manager)
 
-app = FastAPI(title="Lynceus Power Hub API", version="0.2.0-dev")
+@app.on_event("startup")
+async def startup_event():
+    # Start background polling loop
+    asyncio.create_task(poller.start_polling(interval=settings.poll_interval_seconds))
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "app": settings.app_name}
 
-# ============================================================================
-# 1. SNMP Utility Endpoints (Diagnostics & Manual OID Testing)
-# ============================================================================
+@app.get("/api/profiles")
+async def get_profiles():
+    return profile_manager.get_profiles()
 
-class SnmpRequest(BaseModel):
-    host: str
-    community: str = "public"
-    oid: str
-    port: int = 161
+@app.get("/api/targets")
+async def get_targets():
+    return load_targets()
 
-class SnmpSetRequest(BaseModel):
-    host: str
-    community: str = "private"
-    oid: str
-    value: str
-    type: str = "string"  # "string" or "integer"
-    port: int = 161
+@app.get("/api/stream")
+async def telemetry_stream(request: EventSourceResponse):
+    async def event_generator():
+        while True:
+            if await request.is_disconnected():
+                break
+            telemetry_data = poller.get_latest_telemetry()
+            yield {
+                "event": "message",
+                "data": json.dumps(telemetry_data)
+            }
+            await asyncio.sleep(settings.poll_interval_seconds)
 
-
-@app.post("/api/snmp/get")
-async def snmp_get(req: SnmpRequest):
-    """Retrieves a single OID value from an SNMP-enabled target."""
-    iterator = getCmd(
-        SnmpEngine(),
-        CommunityData(req.community, mpModel=1),
-        UdpTransportTarget((req.host, req.port), timeout=2.0, retries=1),
-        ContextData(),
-        ObjectType(ObjectIdentity(req.oid))
-    )
-
-    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
-
-    if errorIndication:
-        raise HTTPException(status_code=500, detail=str(errorIndication))
-    elif errorStatus:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or '?'}"
-        )
-
-    results = []
-    for varBind in varBinds:
-        results.append({
-            "oid": str(varBind[0]),
-            "value": str(varBind[1])
-        })
-
-    return {"status": "success", "data": results}
-
-
-@app.post("/api/snmp/set")
-async def snmp_set(req: SnmpSetRequest):
-    """Modifies a parameter on an SNMP-enabled target."""
-    if req.type.lower() == "integer":
-        try:
-            val_object = Integer32(int(req.value))
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Value must be a valid integer.")
-    else:
-        val_object = OctetString(req.value)
-
-    iterator = setCmd(
-        SnmpEngine(),
-        CommunityData(req.community, mpModel=1),
-        UdpTransportTarget((req.host, req.port), timeout=2.0, retries=1),
-        ContextData(),
-        ObjectType(ObjectIdentity(req.oid), val_object)
-    )
-
-    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
-
-    if errorIndication:
-        raise HTTPException(status_code=500, detail=str(errorIndication))
-    elif errorStatus:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or '?'}"
-        )
-
-    results = []
-    for varBind in varBinds:
-        results.append({
-            "oid": str(varBind[0]),
-            "value": str(varBind[1])
-        })
-
-    return {"status": "success", "data": results}
-
-
-@app.post("/api/snmp/walk")
-async def snmp_walk(req: SnmpRequest):
-    """Traverses an SNMP subtree starting at the provided base OID."""
-    results = []
-    
-    for (errorIndication, errorStatus, errorIndex, varBinds) in nextCmd(
-        SnmpEngine(),
-        CommunityData(req.community, mpModel=1),
-        UdpTransportTarget((req.host, req.port), timeout=2.0, retries=1),
-        ContextData(),
-        ObjectType(ObjectIdentity(req.oid)),
-        lexicographicMode=False
-    ):
-        if errorIndication:
-            raise HTTPException(status_code=500, detail=str(errorIndication))
-        elif errorStatus:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or '?'}"
-            )
-        else:
-            for varBind in varBinds:
-                results.append({
-                    "oid": str(varBind[0]),
-                    "value": str(varBind[1])
-                })
-
-    return {"status": "success", "count": len(results), "data": results}
-
-
-# ============================================================================
-# 2. Phase 1 Power Infrastructure Dashboard Routes
-# ============================================================================
-
-from datetime import datetime, timezone
-from app.models import DeviceTelemetryResponse, TelemetryMetrics
-
-@app.get("/api/devices", response_model=List[DeviceTelemetryResponse])
-async def get_devices():
-    configs = load_devices_config()
-    response_list = []
-
-    for config in configs:
-        dev_id = getattr(config, "id", getattr(config, "device_id", "unknown-device"))
-        dev_name = getattr(config, "name", "Unknown Device")
-        dev_type = getattr(config, "device_type", "ups")
-        dev_proto = getattr(config, "driver", getattr(config, "protocol", "snmp"))
-
-        try:
-            driver = get_driver(config)
-            telemetry = await driver.poll()
-
-            # Fix: If driver.poll() returned a DeviceTelemetryResponse object directly
-            if isinstance(telemetry, DeviceTelemetryResponse):
-                response_list.append(telemetry)
-                continue
-
-            # If telemetry is a dict, extract or attach device_id
-            if isinstance(telemetry, dict):
-                telemetry["device_id"] = dev_id
-                telemetry = TelemetryMetrics(**telemetry)
-
-            is_online = getattr(telemetry, "status", "offline") != "offline"
-
-            response_item = DeviceTelemetryResponse(
-                device_id=dev_id,
-                name=dev_name,
-                device_type=dev_type,
-                protocol=dev_proto,
-                status=getattr(telemetry, "status", "normal"),
-                is_reachable=is_online,
-                last_polled=datetime.now(timezone.utc),
-                metrics=telemetry,
-                outlets=[],
-            )
-            response_list.append(response_item)
-
-        except Exception as e:
-            print(f"Error polling device {dev_id}: {type(e).__name__} {e}")
-            traceback.print_exc()
-
-            fallback_metrics = TelemetryMetrics(device_id=dev_id, status="offline")
-            response_list.append(
-                DeviceTelemetryResponse(
-                    device_id=dev_id,
-                    name=dev_name,
-                    device_type=dev_type,
-                    protocol=dev_proto,
-                    status="offline",
-                    is_reachable=False,
-                    last_polled=datetime.now(timezone.utc),
-                    metrics=fallback_metrics,
-                    outlets=[],
-                )
-            )
-
-    return response_list
-    
+    return EventSourceResponse(event_generator())

@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v0.3.1] — 2026-10-12
+
+### Added
+- **Real-Time Telemetry Streaming:** Implemented SSE (`sse-starlette`) background event loop streaming live metrics to the frontend.
+- **Next.js Dashboard Integration:** Connected the App Router frontend UI to backend endpoints (`/api/stream`, `/api/targets`, `/api/profiles`).
+- **SVG Favicon Support:** Added clean production-ready iconography (`favicon.svg`) mapped correctly via Next.js metadata config.
+
 ## [0.3.0] - 2026-10-02
 
 ### Added

@@ -1,53 +1,69 @@
+# backend/app/config.py
 import os
+import json
+from pathlib import Path
 import yaml
-import logging
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-logger = logging.getLogger("uvicorn.error")
+class Settings(BaseSettings):
+    app_name: str = "Lynceus Backend Telemetry"
+    debug: bool = True
+    poll_interval_seconds: int = 5
+    profiles_dir: str = os.getenv("PROFILES_DIR", "./profiles")
+    targets_file: str = os.getenv("TARGETS_FILE", "./targets.json")
+    webhook_enabled: bool = False
+    webhook_url: str = ""
 
-CONFIG_PATH = os.getenv("DEVICES_CONFIG_PATH", "devices.yaml")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
 
-class DeviceConfig(BaseModel):
-    id: str
-    name: str
-    device_type: str = "ups"
-    driver: str = "snmp"
-    profile: str = "rfc1628_default"
-    host: str = "localhost"
-    port: int = 161
-    community: str = "public"
+settings = Settings()
 
-    @property
-    def protocol(self) -> str:
-        """Alias for driver to maintain backwards compatibility."""
-        return self.driver
-
-
-class AppConfig(BaseModel):
-    """Container model for system-wide configuration."""
-    devices: List[DeviceConfig] = Field(default_factory=list)
-
-
-def load_devices_config(config_path: str = CONFIG_PATH) -> List[DeviceConfig]:
-    """
-    Reads devices.yaml and returns a list of validated DeviceConfig instances.
-    """
-    if not os.path.exists(config_path):
-        logger.warning(f"Device configuration file not found at '{config_path}'. Returning empty list.")
-        return []
-
+def load_targets():
+    path = Path(settings.targets_file)
+    if not path.exists():
+        return {}
     try:
-        with open(config_path, "r") as f:
-            raw_devices = yaml.safe_load(f) or []
-
-        devices = [DeviceConfig(**device) for device in raw_devices]
-        logger.info(f"Loaded {len(devices)} device configuration(s) from '{config_path}'")
-        return devices
-
+        with open(path, "r") as f:
+            return json.load(f)
     except Exception as e:
-        logger.error(f"Error reading configuration from '{config_path}': {e}")
-        raise RuntimeError(f"Failed to parse '{config_path}': {e}")
-  
-# Keep alias for backwards compatibility if needed
-load_device_configs = load_devices_config
+        print(f"Error loading targets file: {e}")
+        return {}
+
+class ProfileManager:
+    def __init__(self, profiles_dir: str):
+        self.profiles_dir = Path(profiles_dir)
+        self.profiles = {}
+        self.load_profiles()
+
+    def load_profiles(self):
+        self.profiles = {}
+        if not self.profiles_dir.exists():
+            print(f"Profiles directory {self.profiles_dir} does not exist.")
+            return
+        
+        for file_path in self.profiles_dir.glob("*.yaml"):
+            try:
+                with open(file_path, "r") as f:
+                    data = yaml.safe_load(f)
+                    if data and "device_type" in data:
+                        self.profiles[data["device_type"]] = data
+            except Exception as e:
+                print(f"Error loading profile {file_path}: {e}")
+        
+        for file_path in self.profiles_dir.glob("*.yml"):
+            try:
+                with open(file_path, "r") as f:
+                    data = yaml.safe_load(f)
+                    if data and "device_type" in data:
+                        self.profiles[data["device_type"]] = data
+            except Exception as e:
+                print(f"Error loading profile {file_path}: {e}")
+
+    def get_profiles(self):
+        return self.profiles
+
+# Instantiated so `profile_manager` can be imported directly by main.py
+profile_manager = ProfileManager(settings.profiles_dir)

@@ -1,0 +1,44 @@
+device_type: "apc_smart_ups"
+sys_object_id: "1.3.6.1.4.1.318.1.3.25"
+manufacturer: "APC"
+model_series: "Smart-UPS"
+
+metrics:
+  input_voltage:
+    oid: "1.3.6.1.4.1.318.1.1.1.3.2.1.0"
+    scale: 1.0
+    unit: "V"
+    description: "Input line voltage to the UPS"
+    thresholds:
+      warning: 35.0
+      critical: 42.0
+
+  output_load:
+    oid: "1.3.6.1.4.1.318.1.1.1.4.3.3.0"
+    scale: 1.0
+    unit: "%"
+    description: "Percentage of UPS capacity currently being used"
+    thresholds:
+      warning: 35.0
+      critical: 42.0
+      
+    
+  battery_charge:
+    oid: "1.3.6.1.4.1.318.1.1.1.2.2.1.0"
+    scale: 1.0
+    unit: "%"
+    description: "Remaining battery capacity percentage"
+    thresholds:
+      warning: 35.0
+      critical: 42.0
+      
+    
+  battery_temperature:
+    oid: "1.3.6.1.4.1.318.1.1.1.2.2.2.0"
+    scale: 0.1
+    unit: "°C"
+    description: "Internal battery temperature"
+    thresholds:
+      warning: 35.0
+      critical: 42.0
+      

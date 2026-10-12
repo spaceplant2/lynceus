@@ -24,17 +24,20 @@ Lynceus is a lightweight, modern SNMP management web interface built with a **Fa
 ---
 
 ## 🚀 Quickstart
+1. Clone the repository and configure your `.env` and `targets.json`.
+2. Spin up the containerized stack:
+   ```bash
+   docker compose up --build
 
 ### Prerequisites
 
 - **Linux / macOS:** [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
 - **Windows:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) with the WSL 2 backend enabled- [Git](https://git-scm.com/)
 
-### Running the Application
+## Current Status: v0.3.0 (Operational Real-Time Stream)
+- **Backend:** FastAPI, Async PySNMP, SSE Streaming, YAML Profile Management.
+- **Frontend:** Next.js 14+ (App Router), Tailwind CSS, Recharts.
+- **Deployment:** Docker & Docker Compose multi-container stack.
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/spaceplant2/lynceus.git
-   cd lynceus
-   ```
+
    

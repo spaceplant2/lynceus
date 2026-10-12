@@ -1,33 +1,39 @@
 ---
-
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: lynceus-backend
-    restart: always
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/profiles:/app/profiles
+      - ./backend/targets.json:/app/targets.json
     environment:
-      - PORT=8000
-    networks:
-      - lynceus-net
+      - PROFILES_DIR=/app/profiles
+      - TARGETS_FILE=/app/targets.json
+      - WEBHOOK_ENABLED=${WEBHOOK_ENABLED}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     container_name: lynceus-frontend
-    restart: always
     ports:
-      - "80:80"
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    restart: unless-stopped
     depends_on:
-      - backend
-    networks:
-      - lynceus-net
-
-networks:
-  lynceus-net:
-    driver: bridge
-
+      backend:
+        condition: service_healthy

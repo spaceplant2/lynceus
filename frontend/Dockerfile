@@ -1,21 +1,21 @@
-
-# Stage 1: Build React App
-FROM node:20-slim AS build
-
+# frontend/Dockerfile
+FROM node:20-alpine AS builder
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install
-
+RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve with Nginx
-FROM nginx:alpine
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
 
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-EXPOSE 80
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]

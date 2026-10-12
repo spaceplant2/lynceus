@@ -47,7 +47,7 @@ Lynceus follows [Semantic Versioning 2.0.0](https://semver.org/) (`MAJOR.MINOR.P
 - [x] Implement non-blocking async execution with a strict timeout per polling loop.
 - [x] Normalize raw SNMP integers/gauge values into standard Pydantic models.
 
-### v0.3.1 — Frontend Integration & Real-Time Dashboard (Completed)
+### v0.3.0 — Frontend Integration & Real-Time Dashboard (Completed)
 - [x] Connect Next.js frontend dashboard to backend endpoints (`/api/stream`, `/api/targets`, `/api/profiles`).
 - [x] Implement SSE (Server-Sent Events) telemetry data streaming via `sse-starlette`.
 - [x] Build responsive visual UI components for live UPS and PDU metrics.

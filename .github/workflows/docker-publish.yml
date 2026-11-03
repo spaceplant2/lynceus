@@ -4,14 +4,12 @@ on:
   push:
     branches:
       - main
-      - upgrade-node-24
     tags:
       - 'v*.*.*'
       - 'v*.*'
   pull_request:
     branches:
       - main
-      - upgrade-node-24
   workflow_dispatch:
 
 env:
@@ -28,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify and locate Dockerfile
         run: |

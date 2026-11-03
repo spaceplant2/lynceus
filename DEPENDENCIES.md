@@ -86,7 +86,7 @@ Lynceus relies on zero-dependency native Node 22 modules for mission-critical st
 
 | Action / Workflow Component | Current Version | Role |
 | :--- | :--- | :--- |
-| **`actions/checkout`** | `v4` | Repository checkout with full commit history. |
+| **`actions/checkout`** | `v5` | Repository checkout with full commit history natively running on Node 24. |
 | **`docker/setup-qemu-action`** | `v4` | Multi-architecture QEMU emulation for `linux/amd64` and `linux/arm64`. |
 | **`docker/setup-buildx-action`** | `v4` | Docker Buildx setup with BuildKit features and cache mounting. |
 | **`docker/login-action`** | `v4` | Authentication with GitHub Container Registry (`ghcr.io`). |

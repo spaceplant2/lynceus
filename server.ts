@@ -334,7 +334,7 @@ async function startServer() {
 FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci || npm install
 COPY . .
 RUN npm run build
 
@@ -349,7 +349,7 @@ ENV PORT=3000
 ENV CONFIG_DIR=/app/config
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN (npm ci --omit=dev || npm install --omit=dev) && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/server ./server

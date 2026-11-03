@@ -5,7 +5,7 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci || npm install
 
 COPY . .
 RUN npm run build
@@ -22,9 +22,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV CONFIG_DIR=/app/config
 
-# Install production dependencies required at runtime
+# Install production dependencies required at runtime (resilient fallback if lockfile is out of sync)
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN (npm ci --omit=dev || npm install --omit=dev) && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.ts ./server.ts

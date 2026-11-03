@@ -1,0 +1,35 @@
+---
+# Lynceus - UPS & PDU SNMP Power Monitor & Remote Control
+# Quick launch with pre-built image: docker compose up -d
+
+services:
+  lynceus:
+    # Pre-built multi-architecture container from GitHub Container Registry (linux/amd64, linux/arm64)
+    image: ghcr.io/spaceplant2/lynceus:latest
+
+    # Build from local source alongside pre-built image support:
+    # - Run 'docker compose up -d' to start with the pre-built image
+    # - Run 'docker compose build' to build locally from Dockerfile
+    # - Run 'docker compose up --build -d' to rebuild and start
+    # - Run 'docker compose pull' to fetch the newest published image from GHCR
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: lynceus
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persistent configuration (YAML files) and encrypted SQLite vault (vault.db):
+      - ./config:/app/config
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - CONFIG_DIR=/app/config
+      # Optional master key for AES-256-GCM encryption of SNMP credentials and user accounts.
+      # If omitted, a persistent key is automatically generated and secured in ./config/.master.key:
+      # - LYNCEUS_MASTER_KEY=my-secure-master-passphrase
+
+    # To enable direct subnet UDP SNMP queries without Docker bridge NAT, uncomment on Linux:
+    # network_mode: host

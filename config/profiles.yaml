@@ -1,0 +1,46 @@
+# Lynceus - MIB OID Profiles Configuration
+# Defines reusable SNMP OID mappings for UPSs and PDUs
+version: 1
+
+profiles:
+  - id: apc-powernet-ups
+    name: "APC PowerNet UPS (Smart-UPS / Symmetra)"
+    deviceType: ups
+    oids:
+      batteryCapacityPct: "1.3.6.1.4.1.318.1.1.1.2.2.1.0"      # upsAdvBatteryCapacity (0-100%)
+      batteryRuntimeMinutes: "1.3.6.1.4.1.318.1.1.1.2.2.3.0"   # upsAdvBatteryRunTimeRemaining (Timeticks in 100ths sec)
+      batteryTempCelsius: "1.3.6.1.4.1.318.1.1.1.2.2.2.0"      # upsAdvBatteryTemperature (Celsius)
+      batteryVoltage: "1.3.6.1.4.1.318.1.1.1.2.2.8.0"          # upsAdvBatteryActualVoltage (Volts)
+      inputVoltage: "1.3.6.1.4.1.318.1.1.1.3.2.1.0"            # upsAdvInputLineVoltage (VAC)
+      inputFrequency: "1.3.6.1.4.1.318.1.1.1.3.2.4.0"          # upsAdvInputFrequency (Hz)
+      outputLoadPct: "1.3.6.1.4.1.318.1.1.1.4.2.3.0"           # upsAdvOutputLoad (% load)
+      outputVoltage: "1.3.6.1.4.1.318.1.1.1.4.2.1.0"           # upsAdvOutputVoltage (VAC)
+      outputPowerWatts: "1.3.6.1.4.1.318.1.1.1.4.2.8.0"        # upsAdvOutputActivePower (Watts)
+      outputCurrentAmps: "1.3.6.1.4.1.318.1.1.1.4.2.4.0"       # upsAdvOutputCurrent (Amps)
+      statusState: "1.3.6.1.4.1.318.1.1.1.4.1.1.0"             # upsBasicOutputStatus (2: onLine, 3: onBattery)
+
+  - id: rfc1628-ups
+    name: "Standard RFC 1628 UPS-MIB"
+    deviceType: ups
+    oids:
+      batteryCapacityPct: "1.3.6.1.2.1.33.1.2.4.0"             # upsEstimatedChargeRemaining (%)
+      batteryRuntimeMinutes: "1.3.6.1.2.1.33.1.2.3.0"          # upsEstimatedMinutesRemaining (min)
+      batteryTempCelsius: "1.3.6.1.2.1.33.1.2.7.0"             # upsBatteryTemperature (Celsius)
+      batteryVoltage: "1.3.6.1.2.1.33.1.2.5.0"                 # upsBatteryVoltage (0.1V)
+      inputVoltage: "1.3.6.1.2.1.33.1.3.3.1.3.1"               # upsInputVoltage (VAC)
+      inputFrequency: "1.3.6.1.2.1.33.1.3.3.1.2.1"             # upsInputFrequency (0.1Hz)
+      outputLoadPct: "1.3.6.1.2.1.33.1.4.4.1.5.1"              # upsOutputPercentLoad (%)
+      outputVoltage: "1.3.6.1.2.1.33.1.4.4.1.2.1"              # upsOutputVoltage (VAC)
+      outputPowerWatts: "1.3.6.1.2.1.33.1.4.4.1.4.1"           # upsOutputPower (Watts)
+      outputCurrentAmps: "1.3.6.1.2.1.33.1.4.4.1.3.1"          # upsOutputCurrent (0.1A)
+      statusState: "1.3.6.1.2.1.33.1.4.1.0"                    # upsOutputSource (3: normal, 5: battery)
+
+  - id: apc-switched-pdu
+    name: "APC Switched Rack PDU (AP79xx / AP89xx)"
+    deviceType: pdu
+    oids:
+      totalCurrentAmps: "1.3.6.1.4.1.318.1.1.12.2.3.1.1.2.1"   # rPDULoadStatusLoad (0.1A)
+      inputVoltage: "1.3.6.1.4.1.318.1.1.12.1.1.0"             # Line Voltage
+      totalPowerWatts: "1.3.6.1.4.1.318.1.1.12.1.16.0"         # rPDUIdentDevicePowerWatts
+      outletStatusBaseOid: "1.3.6.1.4.1.318.1.1.4.4.2.1.3"     # sPDUOutletCtl (1: on, 2: off)
+      outletControlBaseOid: "1.3.6.1.4.1.318.1.1.4.4.2.1.3"    # sPDUOutletCtl (1: immediateOn, 2: immediateOff, 3: immediateReboot)

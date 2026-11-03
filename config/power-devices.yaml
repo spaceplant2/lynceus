@@ -1,0 +1,151 @@
+# Lynceus Power Monitor & Control Configuration
+# Editable via Dashboard UI or directly in this YAML file.
+version: 1
+
+settings:
+  pollIntervalDefaultSec: 3
+  historyBufferMinutes: 30
+  alertThresholds:
+    batteryRuntimeWarningMin: 15
+    batteryRuntimeCriticalMin: 5
+    overloadWarningPct: 80
+    overloadCriticalPct: 95
+    highTempCelsius: 38
+    lowVoltageVac: 108
+    highVoltageVac: 128
+  # Allow realistic rack hardware simulation when physical SNMP hosts are unreachable on local subnet
+  allowLabSimulationFallback: true
+
+# Reusable MIB OID Profiles
+profiles:
+  - id: apc-powernet-ups
+    name: "APC PowerNet UPS (Smart-UPS / Symmetra)"
+    deviceType: ups
+    oids:
+      batteryCapacityPct: "1.3.6.1.4.1.318.1.1.1.2.2.1.0"      # upsAdvBatteryCapacity (0-100%)
+      batteryRuntimeMinutes: "1.3.6.1.4.1.318.1.1.1.2.2.3.0"   # upsAdvBatteryRunTimeRemaining (Timeticks in 100ths sec)
+      batteryTempCelsius: "1.3.6.1.4.1.318.1.1.1.2.2.2.0"      # upsAdvBatteryTemperature (Celsius)
+      batteryVoltage: "1.3.6.1.4.1.318.1.1.1.2.2.8.0"          # upsAdvBatteryActualVoltage (Volts)
+      inputVoltage: "1.3.6.1.4.1.318.1.1.1.3.2.1.0"            # upsAdvInputLineVoltage (VAC)
+      inputFrequency: "1.3.6.1.4.1.318.1.1.1.3.2.4.0"          # upsAdvInputFrequency (Hz)
+      outputLoadPct: "1.3.6.1.4.1.318.1.1.1.4.2.3.0"           # upsAdvOutputLoad (% load)
+      outputVoltage: "1.3.6.1.4.1.318.1.1.1.4.2.1.0"           # upsAdvOutputVoltage (VAC)
+      outputPowerWatts: "1.3.6.1.4.1.318.1.1.1.4.2.8.0"        # upsAdvOutputActivePower (Watts)
+      outputCurrentAmps: "1.3.6.1.4.1.318.1.1.1.4.2.4.0"       # upsAdvOutputCurrent (Amps)
+      statusState: "1.3.6.1.4.1.318.1.1.1.4.1.1.0"             # upsBasicOutputStatus (2: onLine, 3: onBattery)
+
+  - id: rfc1628-ups
+    name: "Standard RFC 1628 UPS-MIB"
+    deviceType: ups
+    oids:
+      batteryCapacityPct: "1.3.6.1.2.1.33.1.2.4.0"             # upsEstimatedChargeRemaining (%)
+      batteryRuntimeMinutes: "1.3.6.1.2.1.33.1.2.3.0"          # upsEstimatedMinutesRemaining (min)
+      batteryTempCelsius: "1.3.6.1.2.1.33.1.2.7.0"             # upsBatteryTemperature (Celsius)
+      batteryVoltage: "1.3.6.1.2.1.33.1.2.5.0"                 # upsBatteryVoltage (0.1V)
+      inputVoltage: "1.3.6.1.2.1.33.1.3.3.1.3.1"               # upsInputVoltage (VAC)
+      inputFrequency: "1.3.6.1.2.1.33.1.3.3.1.2.1"             # upsInputFrequency (0.1Hz)
+      outputLoadPct: "1.3.6.1.2.1.33.1.4.4.1.5.1"              # upsOutputPercentLoad (%)
+      outputVoltage: "1.3.6.1.2.1.33.1.4.4.1.2.1"              # upsOutputVoltage (VAC)
+      outputPowerWatts: "1.3.6.1.2.1.33.1.4.4.1.4.1"           # upsOutputPower (Watts)
+      outputCurrentAmps: "1.3.6.1.2.1.33.1.4.4.1.3.1"          # upsOutputCurrent (0.1A)
+      statusState: "1.3.6.1.2.1.33.1.4.1.0"                    # upsOutputSource (3: normal, 5: battery)
+
+  - id: apc-switched-pdu
+    name: "APC Switched Rack PDU (AP79xx / AP89xx)"
+    deviceType: pdu
+    oids:
+      totalCurrentAmps: "1.3.6.1.4.1.318.1.1.12.2.3.1.1.2.1"   # rPDULoadStatusLoad (0.1A)
+      inputVoltage: "1.3.6.1.4.1.318.1.1.12.1.1.0"             # rPDUIdentModelNumber / Line Voltage
+      totalPowerWatts: "1.3.6.1.4.1.318.1.1.12.1.16.0"         # rPDUIdentDevicePowerWatts
+      outletStatusBaseOid: "1.3.6.1.4.1.318.1.1.4.4.2.1.3"     # sPDUOutletCtl (1: on, 2: off)
+      outletControlBaseOid: "1.3.6.1.4.1.318.1.1.4.4.2.1.3"    # sPDUOutletCtl (1: immediateOn, 2: immediateOff, 3: immediateReboot)
+
+# Configured Devices (UPS & PDU)
+devices:
+  - id: ups-datacenter-01
+    name: "APC Smart-UPS RT 3000 (Rack 1A)"
+    type: ups
+    host: "192.168.10.15"
+    port: 161
+    snmpVersion: "2c"
+    community: "public"
+    pollIntervalSec: 3
+    profile: apc-powernet-ups
+    nominalVoltage: 120
+    capacityWatts: 2700
+
+  - id: pdu-rack-alpha
+    name: "APC AP7920B 8-Port Switched PDU (Rack 1A)"
+    type: pdu
+    host: "192.168.10.20"
+    port: 161
+    snmpVersion: "2c"
+    community: "private"
+    pollIntervalSec: 3
+    profile: apc-switched-pdu
+    ratedAmps: 16
+    nominalVoltage: 120
+    outlets:
+      - index: 1
+        name: "Core Gateway Router"
+        equipment: "Cisco ISR 4331"
+        isCriticalLocked: true
+        rebootDelaySec: 15
+      - index: 2
+        name: "Primary Core Switch"
+        equipment: "Arista 7050SX3"
+        isCriticalLocked: true
+        rebootDelaySec: 10
+      - index: 3
+        name: "VMware Hypervisor 01"
+        equipment: "Dell PowerEdge R640"
+        isCriticalLocked: false
+        rebootDelaySec: 20
+      - index: 4
+        name: "VMware Hypervisor 02"
+        equipment: "Dell PowerEdge R640"
+        isCriticalLocked: false
+        rebootDelaySec: 20
+      - index: 5
+        name: "SAN Storage Controller A"
+        equipment: "TrueNAS Enterprise Z20"
+        isCriticalLocked: true
+        rebootDelaySec: 30
+      - index: 6
+        name: "In-Band Console Server"
+        equipment: "Opengear CM7108"
+        isCriticalLocked: false
+        rebootDelaySec: 10
+      - index: 7
+        name: "Rack Exhaust Fans"
+        equipment: "Tripp Lite SRFAN3U"
+        isCriticalLocked: false
+        rebootDelaySec: 5
+      - index: 8
+        name: "Spare Outlet"
+        equipment: "Unassigned"
+        isCriticalLocked: false
+        rebootDelaySec: 5
+
+  - id: ups-edge-mdf
+    name: "Eaton 9PX 1500RT (Edge MDF)"
+    type: ups
+    host: "192.168.10.18"
+    port: 161
+    snmpVersion: "2c"
+    community: "public"
+    pollIntervalSec: 4
+    profile: rfc1628-ups
+    nominalVoltage: 120
+    capacityWatts: 1500
+    outlets:
+      - index: 1
+        name: "Switched Load Segment 1"
+        equipment: "PoE Surveillance Switch"
+        isCriticalLocked: false
+        rebootDelaySec: 10
+      - index: 2
+        name: "Switched Load Segment 2"
+        equipment: "Access Point Controllers"
+        isCriticalLocked: false
+        rebootDelaySec: 10

@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.github
+.aistudio
+*.log
+*.bak
+config/*.db*
+config/.master.key*

@@ -1,0 +1,16 @@
+# Lynceus - General Settings Configuration
+version: 1
+
+settings:
+  pollIntervalDefaultSec: 3
+  historyBufferMinutes: 30
+  alertThresholds:
+    batteryRuntimeWarningMin: 15
+    batteryRuntimeCriticalMin: 5
+    overloadWarningPct: 80
+    overloadCriticalPct: 95
+    highTempCelsius: 38
+    lowVoltageVac: 108
+    highVoltageVac: 128
+  # Allow realistic rack hardware simulation when physical SNMP hosts are unreachable on local subnet
+  allowLabSimulationFallback: true

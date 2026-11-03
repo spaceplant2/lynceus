@@ -1,0 +1,7 @@
+{
+  "name": "Lynceus - UPS & PDU Dashboard",
+  "description": "Lightweight, self-hosted web dashboard for real-time SNMP monitoring and remote outlet management of UPSs and PDUs with YAML configuration and Docker deployment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

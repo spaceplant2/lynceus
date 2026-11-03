@@ -1,0 +1,118 @@
+name: Build and Publish Container Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+      - 'v*.*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify and locate Dockerfile
+        run: |
+          echo "=== Workspace Context ==="
+          pwd
+          ls -la
+          
+          # Detect Dockerfile (root or subdirectories, case-insensitive)
+          DOCKERFILE_FOUND=""
+          if [ -f "Dockerfile" ]; then
+            DOCKERFILE_FOUND="./Dockerfile"
+          elif [ -f "dockerfile" ]; then
+            DOCKERFILE_FOUND="./dockerfile"
+          else
+            # Search for any Dockerfile in the checkout
+            FOUND=$(find . -maxdepth 3 -iname "*dockerfile*" -type f | head -n 1)
+            if [ -n "$FOUND" ]; then
+              DOCKERFILE_FOUND="$FOUND"
+            fi
+          fi
+
+          if [ -z "$DOCKERFILE_FOUND" ]; then
+            echo "::error::Neither 'Dockerfile' nor 'dockerfile' was found in the repository checkout."
+            echo "Checked-out files in $(pwd):"
+            ls -la
+            echo "Full file tree:"
+            find . -maxdepth 2 -not -path '*/.*'
+            echo ""
+            echo "To fix this error, ensure Dockerfile is committed and pushed to git:"
+            echo "  git add Dockerfile"
+            echo "  git commit -m 'Add Dockerfile'"
+            echo "  git push"
+            exit 1
+          fi
+
+          BUILD_DIR=$(dirname "$DOCKERFILE_FOUND")
+          echo "Found Dockerfile at: $DOCKERFILE_FOUND"
+          echo "Build context: $BUILD_DIR"
+          
+          echo "DOCKERFILE_PATH=$DOCKERFILE_FOUND" >> ${GITHUB_ENV}
+          echo "BUILD_CONTEXT=$BUILD_DIR" >> ${GITHUB_ENV}
+
+      - name: Set lower case repository name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Set up QEMU (Multi-platform emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,format=short
+
+      - name: Build and push multi-arch Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BUILD_CONTEXT }}
+          file: ${{ env.DOCKERFILE_PATH }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Docker Compose configuration
+        run: |
+          docker compose config

@@ -17,37 +17,30 @@ It can be deployed in seconds without needing to clone the source code or instal
 
 ---
 
-### Option 1: Docker Compose (Unified Pre-Built & Build-From-Source)
+### Option 1: Docker Compose (Unified Pre-Built)
 
-The repository's `docker-compose.yml` is configured so that **pre-built image execution** and **local source compilation** co-exist seamlessly:
+The repository's `docker-compose.yml` is configured for local building, and docker-compose.standalone.yml is for pulling and running the pre-built container:
 
 ```yaml
 ---
 services:
   lynceus:
-    # Pre-built multi-arch image from GitHub Container Registry:
     image: ghcr.io/spaceplant2/lynceus:latest
-
-    # Build from local source (co-exists with image above):
-    build:
-      context: .
-      dockerfile: Dockerfile
-
     container_name: lynceus
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      # Persistent configuration and encrypted SQLite credentials vault:
+      # Persistent configuration (YAML files) and encrypted SQLite vault (vault.db):
       - ./config:/app/config
     environment:
       - PORT=3000
       - NODE_ENV=production
       - CONFIG_DIR=/app/config
-      # Optional master key for AES-256-GCM encryption of credentials:
-      # - LYNCEUS_MASTER_KEY="your-high-entropy-master-secret"
+      # Optional master encryption key:
+      # - LYNCEUS_MASTER_KEY=my-secure-master-passphrase
 
-    # Uncomment on Linux if devices are on distinct VLANs requiring direct UDP broadcast:
+    # Uncomment on Linux if direct subnet UDP broadcast is required:
     # network_mode: host
 ```
 

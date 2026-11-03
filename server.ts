@@ -331,14 +331,14 @@ async function startServer() {
     res.json({
       dockerfile: `# Lynceus - UPS & PDU SNMP Power Monitor & Remote Control
 # Multi-stage lightweight multi-architecture production Docker build (linux/amd64, linux/arm64)
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 LABEL org.opencontainers.image.title="Lynceus"
 LABEL org.opencontainers.image.description="Lightweight, self-hosted web dashboard for real-time SNMP monitoring and remote outlet management of UPSs and PDUs."

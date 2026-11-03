@@ -8,8 +8,8 @@ This document provides a comprehensive inventory of all technologies, runtime pl
 
 | Technology | Category | Current Version | Purpose | Upgrade / Update Policy |
 | :--- | :--- | :--- | :--- | :--- |
-| **Node.js** | Core Runtime | `22.x` (LTS — Active: `v22.23.3`) | Server runtime, executing `server.ts` and background SNMP polling loops. | Follow Node.js Active LTS releases (even versions). |
-| **Alpine Linux** | Container OS | `node:22-alpine` (Alpine 3.21) | Minimal, hardened container base image for production builds. | Rebuild monthly or trigger via automated workflow to consume base image security patches. |
+| **Node.js** | Core Runtime | `24.x` (LTS Current — Node 24) | Server runtime, executing `server.ts` and background SNMP polling loops. | Follow Node.js Active LTS releases. |
+| **Alpine Linux** | Container OS | `node:24-alpine` (Alpine 3.21+) | Minimal, hardened container base image for production builds. | Rebuild monthly or trigger via automated workflow to consume base image security patches. |
 | **npm** | Package Manager | `10.9.x` | Dependency resolution and lockfile management (`package-lock.json`). | Bundled with Node.js LTS release. |
 | **Docker Engine & CLI** | Containerization | `24.x` / `25.x` / `26.x` | Container runtime engine supporting multi-arch images (`linux/amd64`, `linux/arm64`). | Compatible with standard OCI / Docker Engine. |
 | **Docker Compose** | Orchestration | `v2.x` (Compose Spec) | Local and production multi-container orchestration. | Uses Compose v2 specification. |
@@ -87,11 +87,11 @@ Lynceus relies on zero-dependency native Node 22 modules for mission-critical st
 | Action / Workflow Component | Current Version | Role |
 | :--- | :--- | :--- |
 | **`actions/checkout`** | `v4` | Repository checkout with full commit history. |
-| **`docker/setup-qemu-action`** | `v3` | Multi-architecture QEMU emulation for `linux/amd64` and `linux/arm64`. |
-| **`docker/setup-buildx-action`** | `v3` | Docker Buildx setup with BuildKit features and cache mounting. |
-| **`docker/login-action`** | `v3` | Authentication with GitHub Container Registry (`ghcr.io`). |
-| **`docker/metadata-action`** | `v5` | Automated extraction of OCI tags and release labels. |
-| **`docker/build-push-action`** | `v6` | Multi-platform image compilation and direct push to GHCR. |
+| **`docker/setup-qemu-action`** | `v4` | Multi-architecture QEMU emulation for `linux/amd64` and `linux/arm64`. |
+| **`docker/setup-buildx-action`** | `v4` | Docker Buildx setup with BuildKit features and cache mounting. |
+| **`docker/login-action`** | `v4` | Authentication with GitHub Container Registry (`ghcr.io`). |
+| **`docker/metadata-action`** | `v6` | Automated extraction of OCI tags and release labels. |
+| **`docker/build-push-action`** | `v7` | Multi-platform image compilation and direct push to GHCR natively running on Node 24. |
 
 ---
 

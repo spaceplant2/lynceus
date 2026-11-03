@@ -151,7 +151,7 @@ export const DockerAndTools: React.FC = () => {
             <span>Self-Hosting with Docker & Docker Compose</span>
           </div>
           <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-            Node 22 Alpine Multi-Stage
+            Node 24 Alpine Multi-Stage
           </span>
         </div>
 

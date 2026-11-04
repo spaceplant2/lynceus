@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="theme-header border-b sticky top-0 z-40 backdrop-blur transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Zone 1: Brand Wordmark */}
+        {/* Zone 1: Brand Wordmark & Logo */}
         <div className="flex items-center gap-3 shrink-0">
           <a
             href="#overview"
@@ -79,10 +79,16 @@ export const Header: React.FC<HeaderProps> = ({
               e.preventDefault();
               setActiveTab('overview');
             }}
-            className={`text-lg font-bold tracking-tight transition-colors whitespace-nowrap shrink-0 font-mono flex items-center gap-2 ${theme.brandTextClass}`}
+            className={`text-lg font-bold tracking-tight transition-colors whitespace-nowrap shrink-0 font-mono flex items-center gap-2.5 ${theme.brandTextClass}`}
           >
-            <span className={`w-2.5 h-2.5 rounded-full inline-block ${theme.brandDotClass}`} />
-            LYNCEUS
+            <img
+              src="/graphics/icons/lynceus-logo-dark_green.png"
+              alt="Lynceus Logo"
+              className="w-8 h-8 object-contain shrink-0 hover:scale-105 transition-transform"
+              width={32}
+              height={32}
+            />
+            <span className="tracking-wide">LYNCEUS</span>
           </a>
         </div>
 

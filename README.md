@@ -1,4 +1,4 @@
-<img src="graphics/icons/lynceus-logo-dark_green.jpeg" width=100 />
+<img src="graphics/icons/lynceus-logo-dark_green.png" width=100 />
 
 # Lynceus 
 ## UPS & PDU SNMP Power Dashboard
@@ -461,3 +461,10 @@ npm run build
 # Start production server
 npm run start
 ```
+
+---
+
+## License
+
+Lynceus is licensed under the [MIT License](./LICENSE). Free for personal, homelab, and commercial use.
+

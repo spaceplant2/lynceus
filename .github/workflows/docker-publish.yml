@@ -7,10 +7,26 @@ on:
     tags:
       - 'v*.*.*'
       - 'v*.*'
+    paths-ignore:
+      - '**.md'
+      - 'graphics/**'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'graphics/**'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force a container build regardless of changed files'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io

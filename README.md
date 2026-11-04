@@ -1,7 +1,66 @@
-# Lynceus
+<img src="graphics/icons/lynceus-logo-dark_green.jpeg" width=100 />
+
+# Lynceus 
 ## UPS & PDU SNMP Power Dashboard
 
 Lynceus is a lightweight, self-hosted web dashboard designed for private local networks, homelabs, and datacenter racks to monitor and manage UPSs (Uninterruptible Power Supplies) and PDUs (Power Distribution Units) via SNMP.
+
+The dashboard features a general overview of power consumption and battery charge as well as individual outlet toggling and toggle locking. Short-term telemetry visualizations are created, but this project is focused on management not on data tracking. For longer term datatracking, I suggest Prometheus.
+
+Configuration can be done either through the GUI editor or directly in the configuration files. Syntax is automagically validated when the GUI editor is used and the container will reload when it see changes.
+
+SNMP communities and passwords are kept encrypted at rest and a built-in automation for rotating the master encryption key is available.
+
+Ad-Hoc queries are possible from the tools page, allowing for initial exploration of targets. Also an API is available and a reference is available.
+
+#### Contents
+
+[Quick Start Guide](README.md#quick-start-with-docker)
+
+[Setup guide](README.md#guide-adding--modifying-snmp-communities--credentials)
+
+[Important Notes](README.md#important-network--firewall-notes)
+
+[Key Features](README.md#key-dashboard-features)
+
+[API Reference](API_REFERENCE.md)
+
+[Version Tracking](README.md#technologies-dependencies--version-tracking)
+
+[Dependencies Matrix](DEPENDENCIES.md)
+
+[Local Development](README.md#local-development-without-docker)
+
+---
+
+### Screenshots of the dashboard in simulation mode
+
+Click on the arrows to show or hide the screenshots.
+
+<details>
+  <summary>Overview Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-1.png" />
+</details>
+<details>
+  <summary>Outlets Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-2.png" />
+</details>
+<details>
+  <summary>Telemetry Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-3.png" />
+</details>
+<details>
+  <summary>Configuration Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-4.png" />
+</details>
+<details>
+  <summary>Vault Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-5.png" />
+</details>
+<details>
+  <summary>Docker & Tools Dashboard</summary>
+  <img src="graphics/screenshots/lynceus-dashboard-6.png" />
+</details>
 
 ---
 
@@ -13,19 +72,29 @@ Lynceus is distributed as a lightweight, pre-built multi-architecture container 
 ghcr.io/spaceplant2/lynceus:latest
 ```
 
-It can be deployed in seconds without needing to clone the source code or install Node.js.
+It can be deployed in the usual ways as well as built locally or installed on bare metal without docker.
 
 ---
 
-### Option 1: Docker Compose (Unified Pre-Built)
+### Option 1: Docker Compose (Local Build)
 
-The repository's `docker-compose.yml` is configured for local building, and docker-compose.standalone.yml is for pulling and running the pre-built container:
+The repository's `docker-compose.yml` is configured for automating local builds after cloning the repository:
 
 ```yaml
 ---
 services:
   lynceus:
     image: ghcr.io/spaceplant2/lynceus:latest
+
+    # Build from local source alongside pre-built image support:
+    # - Run 'docker compose up -d' to start with the pre-built image
+    # - Run 'docker compose build' to build locally from Dockerfile
+    # - Run 'docker compose up --build -d' to rebuild and start
+    # - Run 'docker compose pull' to fetch the newest published image from GHCR
+    build:
+      context: .
+      dockerfile: Dockerfile
+
     container_name: lynceus
     restart: unless-stopped
     ports:
@@ -37,10 +106,11 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - CONFIG_DIR=/app/config
-      # Optional master encryption key:
+      # Optional master key for AES-256-GCM encryption of SNMP credentials and user accounts.
+      # If omitted, a persistent key is automatically generated and secured in ./config/.master.key:
       # - LYNCEUS_MASTER_KEY=my-secure-master-passphrase
 
-    # Uncomment on Linux if direct subnet UDP broadcast is required:
+    # To enable direct subnet UDP SNMP queries without Docker bridge NAT, uncomment on Linux:
     # network_mode: host
 ```
 
@@ -49,16 +119,19 @@ services:
 - **Update to latest pre-built image**: `docker compose pull && docker compose up -d`
 - **Build locally from source**: `docker compose build && docker compose up -d` (or `docker compose up -d --build`)
 
-> **Note for Standalone Deployment (without cloning the repository)**:
-> If you are deploying onto a remote server without cloning the source code, use `docker-compose.standalone.yml` (which excludes the local `build:` block):
+### Option 2: Docker Compose (Pre-Built)
+
+The repository's `docker-compose.standalone.yml` is for pulling and running the pre-built container:
+> This excludes the local `build:` section:
 > ```bash
 > curl -sSL https://raw.githubusercontent.com/spaceplant2/lynceus/main/docker-compose.standalone.yml -o docker-compose.yml
+> curl -sSL https://raw.githubusercontent.com/spaceplant2/lynceus/main/.env.example .env
 > docker compose up -d
 > ```
 
 ---
 
-### Option 2: Docker CLI One-Liner
+### Option 3: Docker CLI One-Liner
 
 Run directly using the pre-built image with a local persistent config folder:
 
@@ -75,7 +148,7 @@ docker run -d \
 
 ---
 
-### Option 3: Standard Docker CLI Build
+### Option 4: Standard Docker CLI Build
 
 You can also build the image directly with the Docker CLI using the root `Dockerfile`:
 
@@ -86,7 +159,7 @@ docker run -d --name lynceus -p 3000:3000 -v $(pwd)/config:/app/config lynceus:l
 
 ---
 
-### Automated Multi-Architecture CI/CD (GitHub Actions)
+### Automated Multi-Architecture CI/CD  via GitHub Actions
 
 Container images are automatically built and published to GitHub Container Registry using the included GitHub Actions workflow (`.github/workflows/docker-publish.yml`):
 - **Architectures**: Multi-arch support for `linux/amd64` (Intel/AMD x86_64 servers) and `linux/arm64` (Raspberry Pi 4/5, Apple Silicon, ARM64 homelab SBCs).
@@ -344,17 +417,14 @@ Defines target network equipment, connection parameters, and individual switched
 - **Remote Switched Outlet Control**: Individual outlet Power ON, Power OFF, and Power Cycle (reboot) with delay countdown timers.
 - **Safety Interlock**: Critical hardware outlets (e.g., Core Gateway, Storage NAS) are protected with a two-step confirmation lockout to prevent accidental power cuts.
 - **Security Vault & SNMP v3 Cryptography**: AES-256-GCM authenticated encryption for communities and v3 secrets, SQLite storage, and zero-downtime key rotation.
-- **Dark Mode & 4 Color Themes**:
-  - **Mode Toggle**: Instant Dark Mode and Light Mode switching via the header sun/moon button or appearance settings.
-  - **4 Distinct Color Themes**:
-    - **Electric Blue**: Tech-forward cyan/sky accents (`#38bdf8` dark / `#0284c7` light)
-    - **Emerald Green**: High-visibility energy green accents (`#34d399` dark / `#059669` light)
-    - **Neon Purple**: High-contrast violet accents (`#c084fc` dark / `#7c3aed` light)
-    - **Crimson Red**: Clean, vivid crimson accents (`#f87171` dark / `#dc2626` light)
-  - **All 4 Colors Supported in Both Dark & Light Modes**: Theme colors dynamically style telemetry time-series charts, sparklines, status badges, active tabs, buttons, and borders.
-  - **Persistent Preferences**: Mode and color theme are saved automatically to `localStorage` (`lynceus_theme_mode` and `lynceus_color_theme`).
+- **Dark Mode & 4 Color Themes**
 - **Ad-Hoc SNMP OID Tester**: Built-in diagnostic tool in the *Docker & Tools* tab to test SNMP GET requests against any IP and OID with millisecond latency metrics.
-
+- **Current SNMP support**:
+  - RFC 1628
+  - APC PowerNet
+  - APC PDU (ap79xx, AP89xx)
+- Expandable SNMP Support 
+  Customizeable SNMP MIBs can be added by editing the file `config/profiles.yaml`
 ---
 
 ## REST API Reference

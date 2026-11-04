@@ -1,6 +1,0 @@
-{
-  "summary": "Revised troubleshooting and implementation plan specifically diagnosing and eliminating the GHCR 'Unauthorized' error, covering both workflow push permissions (via PAT fallback) and public pull visibility settings.",
-  "updatedAt": "2026-11-03T18:32:12.594204350Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

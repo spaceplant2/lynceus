@@ -94,8 +94,8 @@ export class SnmpEngine {
     return snmp.createSession(dev.host, community, {
       port: dev.port || 161,
       version: snmpVersion,
-      timeout: 1800,
-      retries: 0,
+      timeout: 2500,
+      retries: 1,
     });
   }
 
@@ -108,6 +108,19 @@ export class SnmpEngine {
   }
 
   private initTelemetryCache(): void {
+    // Purge any stale devices no longer present in current configuration
+    const activeIds = new Set(this.config.devices.map((d) => d.id));
+    for (const key of Array.from(this.telemetryMap.keys())) {
+      if (!activeIds.has(key)) {
+        this.telemetryMap.delete(key);
+      }
+    }
+    for (const labKey of Array.from(this.labStates.keys())) {
+      if (!activeIds.has(labKey)) {
+        this.labStates.delete(labKey);
+      }
+    }
+
     for (const dev of this.config.devices) {
       if (!this.labStates.has(dev.id)) {
         this.labStates.set(dev.id, {
@@ -118,13 +131,24 @@ export class SnmpEngine {
         });
       }
 
+      // Generate distinct deterministic baseline metrics based on device ID and type
+      const seed = Math.abs(dev.id.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0));
+      const nominalCapacity = dev.capacityWatts || (dev.type === 'ups' ? 1500 + (seed % 3) * 750 : 2880);
+      const nominalVolt = dev.nominalVoltage || 120;
+      const baseLoadPct = dev.type === 'ups' ? (28 + (seed % 35)) : (35 + (seed % 38));
+      const outputPower = Math.round((nominalCapacity * baseLoadPct) / 100);
+      const outputAmps = Number((outputPower / nominalVolt).toFixed(2));
+      const batteryRuntime = dev.type === 'ups' ? Math.max(16, Math.round(75 - baseLoadPct * 0.6)) : undefined;
+
       const existing = this.telemetryMap.get(dev.id);
-      const initialOutlets: OutletStatus[] = (dev.outlets || []).map((o) => ({
-        ...o,
-        state: 'on',
-        currentAmps: 1.2,
-        powerWatts: 144,
-      }));
+      const initialOutlets: OutletStatus[] = Array.isArray(dev.outlets)
+        ? dev.outlets.map((o) => ({
+            ...o,
+            state: 'on',
+            currentAmps: Number((0.8 + (Math.abs((seed + o.index * 7) % 20) / 10)).toFixed(2)),
+            powerWatts: Math.round((0.8 + (Math.abs((seed + o.index * 7) % 20) / 10)) * nominalVolt),
+          }))
+        : [];
 
       const initialHistory: MetricDataPoint[] = existing ? existing.history : this.generateInitialHistory(dev);
 
@@ -136,24 +160,24 @@ export class SnmpEngine {
         port: dev.port,
         pollIntervalSec: dev.pollIntervalSec || 3,
         isOnline: true,
-        isSimulated: true, // will update on real SNMP response
+        isSimulated: true, // will update to false on real SNMP response
         lastPolled: Date.now(),
         state: 'normal',
         stateDescription: 'Online - Utility Power Normal',
-        inputVoltage: 120.2,
+        inputVoltage: Number((120.0 + ((seed % 10) - 5) * 0.1).toFixed(1)),
         inputFrequency: 60.0,
-        outputVoltage: 120.0,
-        outputLoadPct: dev.type === 'ups' ? 42 : 55,
-        outputPowerWatts: dev.type === 'ups' ? 1134 : 1050,
-        outputCurrentAmps: 9.4,
+        outputVoltage: nominalVolt,
+        outputLoadPct: baseLoadPct,
+        outputPowerWatts: outputPower,
+        outputCurrentAmps: outputAmps,
         batteryPct: dev.type === 'ups' ? 100 : undefined,
-        runtimeRemainingMin: dev.type === 'ups' ? 52 : undefined,
-        batteryTempCelsius: dev.type === 'ups' ? 24 : undefined,
+        runtimeRemainingMin: batteryRuntime,
+        batteryTempCelsius: dev.type === 'ups' ? (22 + (seed % 6)) : undefined,
         batteryVoltage: dev.type === 'ups' ? 54.2 : undefined,
-        totalCurrentAmps: dev.type === 'pdu' ? 8.8 : undefined,
+        totalCurrentAmps: dev.type === 'pdu' ? outputAmps : undefined,
         ratedAmps: dev.ratedAmps || 16,
-        capacityWatts: dev.capacityWatts || 2700,
-        outlets: existing ? existing.outlets : initialOutlets,
+        capacityWatts: nominalCapacity,
+        outlets: existing && existing.outlets.length === initialOutlets.length ? existing.outlets : initialOutlets,
         history: initialHistory,
       });
     }
@@ -204,15 +228,26 @@ export class SnmpEngine {
 
   private async pollDevice(dev: DeviceConfig): Promise<void> {
     const profile = this.config.profiles.find((p) => p.id === dev.profile);
-    const snmpVersion = dev.snmpVersion === '1' ? snmp.Version1 : snmp.Version2c;
-    
     const session = this.createDeviceSession(dev);
 
     const oidsToQuery: string[] = [];
+    const outletOidMap = new Map<string, number>(); // oid -> outlet index
+
     if (profile?.oids) {
-      for (const oid of Object.values(profile.oids)) {
+      for (const [key, oid] of Object.entries(profile.oids)) {
         if (oid && typeof oid === 'string' && oid.startsWith('1.3.')) {
-          oidsToQuery.push(oid);
+          // If it's a base OID for outlets, query each outlet instance instead of bare base OID
+          if (key === 'outletStatusBaseOid' || key === 'outletControlBaseOid') {
+            if (key === 'outletStatusBaseOid' && Array.isArray(dev.outlets)) {
+              for (const o of dev.outlets) {
+                const outletOid = `${oid}.${o.index}`;
+                oidsToQuery.push(outletOid);
+                outletOidMap.set(outletOid, o.index);
+              }
+            }
+          } else {
+            oidsToQuery.push(oid);
+          }
         }
       }
     }
@@ -224,15 +259,18 @@ export class SnmpEngine {
     session.get(oidsToQuery, (error: Error | null, varbinds?: snmp.Varbind[]) => {
       session.close();
 
-      if (!error && varbinds && varbinds.length > 0 && !isVarbindError(varbinds[0])) {
+      // Check if at least one valid non-error varbind was returned
+      const hasValidVarbind = varbinds && varbinds.some((vb) => !isVarbindError(vb));
+
+      if (!error && hasValidVarbind) {
         // REAL SNMP RESPONSE RECEIVED!
-        this.handleRealSnmpResponse(dev, profile?.oids || {}, varbinds);
+        this.handleRealSnmpResponse(dev, profile?.oids || {}, varbinds, outletOidMap);
       } else {
-        // SNMP failure / timeout (standard in cloud environments or disconnected lab)
+        // SNMP failure / timeout
         if (this.config.settings.allowLabSimulationFallback) {
           this.handleSimulatedTelemetry(dev);
         } else {
-          this.handleDeviceOffline(dev, error ? error.message : 'SNMP timeout');
+          this.handleDeviceOffline(dev, error ? error.message : 'SNMP timeout (no response from target agent)');
         }
       }
     });
@@ -241,7 +279,8 @@ export class SnmpEngine {
   private handleRealSnmpResponse(
     dev: DeviceConfig,
     oidMap: Record<string, string | undefined>,
-    varbinds: snmp.Varbind[]
+    varbinds: snmp.Varbind[],
+    outletOidMap?: Map<string, number>
   ): void {
     const existing = this.telemetryMap.get(dev.id);
     if (!existing) return;
@@ -266,7 +305,13 @@ export class SnmpEngine {
       return undefined;
     };
 
-    const inputVolt = getVal('inputVoltage') ?? existing.inputVoltage;
+    let inputVolt = getVal('inputVoltage');
+    // Tenths of a Volt scaling (e.g. RFC 1628 1200 -> 120.0V)
+    if (inputVolt !== undefined && inputVolt > 500 && inputVolt < 5000) {
+      inputVolt = inputVolt / 10;
+    }
+    inputVolt = inputVolt ?? existing.inputVoltage;
+
     const outputLoad = getVal('outputLoadPct') ?? existing.outputLoadPct;
     const batteryPct = getVal('batteryCapacityPct') ?? existing.batteryPct;
     let runtimeMin = getVal('batteryRuntimeMinutes');
@@ -275,10 +320,38 @@ export class SnmpEngine {
       runtimeMin = Math.round(runtimeMin / 6000);
     }
 
-    const powerWatts = getVal('outputPowerWatts') ?? getVal('totalPowerWatts') ?? existing.outputPowerWatts;
-    const currentAmps = getVal('outputCurrentAmps') ?? getVal('totalCurrentAmps') ?? existing.outputCurrentAmps;
-    const tempC = getVal('batteryTempCelsius') ?? existing.batteryTempCelsius;
-    const freq = getVal('inputFrequency') ?? existing.inputFrequency;
+    // Power and current handling with tenths-of-unit scaling (0.1A)
+    let powerWatts = getVal('outputPowerWatts') ?? getVal('totalPowerWatts');
+    let currentAmps = getVal('outputCurrentAmps') ?? getVal('totalCurrentAmps');
+
+    const maxRated = dev.ratedAmps || (dev.type === 'ups' ? 24 : 16);
+    if (currentAmps !== undefined) {
+      // If current is e.g. 94 on a 16A device, it is returned in 0.1A units (9.4A)
+      if (currentAmps > maxRated && currentAmps < maxRated * 100) {
+        currentAmps = currentAmps / 10;
+      }
+    }
+
+    const nominalCapacity = dev.capacityWatts || (dev.type === 'ups' ? 2400 : maxRated * (inputVolt || 120));
+    if (powerWatts === undefined) {
+      if (currentAmps !== undefined && inputVolt) {
+        powerWatts = Math.round(currentAmps * inputVolt);
+      } else if (outputLoad !== undefined) {
+        powerWatts = Math.round((nominalCapacity * outputLoad) / 100);
+      } else {
+        powerWatts = existing.outputPowerWatts;
+      }
+    }
+
+    if (currentAmps === undefined) {
+      currentAmps = Number((powerWatts / (inputVolt || 120)).toFixed(2));
+    }
+
+    let tempC = getVal('batteryTempCelsius') ?? existing.batteryTempCelsius;
+    let freq = getVal('inputFrequency') ?? existing.inputFrequency;
+    if (freq !== undefined && freq > 400 && freq < 700) {
+      freq = freq / 10;
+    }
 
     let state: PowerState = 'normal';
     let stateDesc = 'Online - Utility Power Normal';
@@ -294,6 +367,22 @@ export class SnmpEngine {
       stateDesc = `Critical - Low Battery Runtime (${runtimeMin}m)`;
     }
 
+    // Update real outlet statuses if outlet OIDs were queried
+    const updatedOutlets: OutletStatus[] = existing.outlets.map((o) => {
+      if (outletOidMap) {
+        for (const [oid, idx] of outletOidMap.entries()) {
+          if (idx === o.index && valuesByOid.has(oid)) {
+            const rawVal = valuesByOid.get(oid);
+            // In APC: 1=on, 2=off, 3=rebooting
+            if (rawVal === 1) return { ...o, state: 'on' as const };
+            if (rawVal === 2) return { ...o, state: 'off' as const, currentAmps: 0, powerWatts: 0 };
+            if (rawVal === 3) return { ...o, state: 'rebooting' as const };
+          }
+        }
+      }
+      return o;
+    });
+
     const updated: DeviceTelemetry = {
       ...existing,
       isOnline: true,
@@ -302,7 +391,7 @@ export class SnmpEngine {
       state,
       stateDescription: stateDesc,
       inputVoltage: Number(inputVolt.toFixed(1)),
-      outputVoltage: 120.0,
+      outputVoltage: dev.nominalVoltage || 120.0,
       inputFrequency: Number(freq.toFixed(1)),
       outputLoadPct: Number(outputLoad.toFixed(1)),
       outputPowerWatts: Math.round(powerWatts),
@@ -311,6 +400,7 @@ export class SnmpEngine {
       runtimeRemainingMin: runtimeMin !== undefined ? Math.round(runtimeMin) : undefined,
       batteryTempCelsius: tempC !== undefined ? Math.round(tempC) : undefined,
       totalCurrentAmps: dev.type === 'pdu' ? Number(currentAmps.toFixed(2)) : undefined,
+      outlets: updatedOutlets,
     };
 
     this.appendHistoryPoint(updated);
@@ -329,29 +419,36 @@ export class SnmpEngine {
       batteryDrainPct: 100,
     };
 
-    // Calculate dynamic values with natural slight jitter
+    // Calculate dynamic values with deterministic device-specific variation so devices never look identical
+    const seed = Math.abs(dev.id.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0), 0));
     const jitter = (Math.random() - 0.5) * 0.8;
-    let inputVoltage = labState.mainsFailed ? 0 : Number((120.2 + jitter).toFixed(1));
+    const nominalVolt = dev.nominalVoltage || 120;
+    const nominalCapacity = dev.capacityWatts || (dev.type === 'ups' ? 1500 + (seed % 3) * 750 : 2880);
+
+    let inputVoltage = labState.mainsFailed ? 0 : Number((nominalVolt + 0.2 + ((seed % 10) - 5) * 0.1 + jitter).toFixed(1));
     const inputFrequency = labState.mainsFailed ? 0 : Number((60.0 + (Math.random() - 0.5) * 0.05).toFixed(2));
     
-    // Count active outlets if PDU
+    // Count active outlets if device has outlets
     const activeOutletsCount = existing.outlets.filter((o) => o.state === 'on').length;
-    const totalOutletsCount = existing.outlets.length || 1;
-    const outletLoadFactor = totalOutletsCount > 0 ? activeOutletsCount / totalOutletsCount : 1;
+    const totalOutletsCount = existing.outlets.length;
+    const outletLoadFactor = totalOutletsCount > 0 ? (activeOutletsCount / totalOutletsCount) : 1;
 
-    let outputLoadPct = dev.type === 'ups' ? 44 + jitter * 2 : (52 * outletLoadFactor) + jitter * 2;
+    const baseLoad = dev.type === 'ups' ? (28 + (seed % 35)) : (35 + (seed % 38));
+    let outputLoadPct = dev.type === 'ups' 
+      ? baseLoad + jitter * 1.5 
+      : (baseLoad * outletLoadFactor) + jitter * 1.5;
+
     if (labState.overloadSimulated) {
       outputLoadPct = 96.5 + (Math.random() * 2);
     }
     outputLoadPct = Math.max(0, Math.min(100, outputLoadPct));
 
-    const nominalCapacity = dev.capacityWatts || 2400;
     const outputPowerWatts = Math.round((nominalCapacity * outputLoadPct) / 100);
-    const outputCurrentAmps = Number((outputPowerWatts / 120).toFixed(2));
+    const outputCurrentAmps = Number((outputPowerWatts / nominalVolt).toFixed(2));
 
     let batteryPct = existing.batteryPct ?? 100;
-    let runtimeRemainingMin = existing.runtimeRemainingMin ?? 52;
-    let batteryTemp = labState.tempSimulatedHigh ? 42 : 24 + Math.round((outputLoadPct / 100) * 5);
+    let runtimeRemainingMin = existing.runtimeRemainingMin ?? Math.max(16, Math.round(75 - outputLoadPct * 0.6));
+    let batteryTemp = labState.tempSimulatedHigh ? 42 : 22 + (seed % 5) + Math.round((outputLoadPct / 100) * 5);
 
     let state: PowerState = 'normal';
     let stateDesc = 'Online - Normal Operation (Lab Simulation)';
@@ -384,11 +481,11 @@ export class SnmpEngine {
     // Update outlets current if active
     const updatedOutlets: OutletStatus[] = existing.outlets.map((o) => {
       if (o.state === 'on') {
-        const baseAmps = o.equipment?.includes('Hypervisor') ? 2.4 : o.equipment?.includes('Storage') ? 2.8 : 1.1;
+        const outletBase = 0.8 + (Math.abs((seed + o.index * 7) % 20) / 10);
         return {
           ...o,
-          currentAmps: Number((baseAmps + (Math.random() - 0.5) * 0.1).toFixed(2)),
-          powerWatts: Math.round(baseAmps * 120),
+          currentAmps: Number((outletBase + (Math.random() - 0.5) * 0.1).toFixed(2)),
+          powerWatts: Math.round(outletBase * nominalVolt),
         };
       }
       return {
@@ -407,7 +504,7 @@ export class SnmpEngine {
       stateDescription: stateDesc,
       inputVoltage,
       inputFrequency,
-      outputVoltage: 120.0,
+      outputVoltage: nominalVolt,
       outputLoadPct: Number(outputLoadPct.toFixed(1)),
       outputPowerWatts,
       outputCurrentAmps,

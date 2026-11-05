@@ -1,0 +1,92 @@
+# Lynceus - Hardware Devices Configuration
+# Monitored UPSs and Switched PDUs with outlet mappings
+version: 1
+
+devices:
+  - id: ups-datacenter-01
+    name: "APC Smart-UPS RT 3000 (Rack 1A)"
+    type: ups
+    host: "192.168.10.15"
+    port: 161
+    snmpVersion: "2c"
+    community: "public"
+    pollIntervalSec: 3
+    profile: apc-powernet-ups
+    nominalVoltage: 120
+    capacityWatts: 2700
+
+  - id: pdu-rack-alpha
+    name: "APC AP7920B 8-Port Switched PDU (Rack 1A)"
+    type: pdu
+    host: "192.168.10.20"
+    port: 161
+    snmpVersion: "2c"
+    community: "private"
+    pollIntervalSec: 3
+    profile: apc-switched-pdu
+    ratedAmps: 16
+    nominalVoltage: 120
+    outlets:
+      - index: 1
+        name: "Core Gateway Router"
+        equipment: "Cisco ISR 4331"
+        isCriticalLocked: true
+        rebootDelaySec: 15
+      - index: 2
+        name: "Primary Core Switch"
+        equipment: "Arista 7050SX3"
+        isCriticalLocked: true
+        rebootDelaySec: 10
+      - index: 3
+        name: "VMware Hypervisor 01"
+        equipment: "Dell PowerEdge R640"
+        isCriticalLocked: false
+        rebootDelaySec: 20
+      - index: 4
+        name: "VMware Hypervisor 02"
+        equipment: "Dell PowerEdge R640"
+        isCriticalLocked: false
+        rebootDelaySec: 20
+      - index: 5
+        name: "SAN Storage Controller A"
+        equipment: "TrueNAS Enterprise Z20"
+        isCriticalLocked: true
+        rebootDelaySec: 30
+      - index: 6
+        name: "In-Band Console Server"
+        equipment: "Opengear CM7108"
+        isCriticalLocked: false
+        rebootDelaySec: 10
+      - index: 7
+        name: "Rack Exhaust Fans"
+        equipment: "Tripp Lite SRFAN3U"
+        isCriticalLocked: false
+        rebootDelaySec: 5
+      - index: 8
+        name: "Spare Outlet"
+        equipment: "Unassigned"
+        isCriticalLocked: false
+        rebootDelaySec: 5
+
+  - id: ups-edge-mdf
+    name: "Eaton 9PX 1500RT (Edge MDF)"
+    type: ups
+    host: "192.168.10.18"
+    port: 161
+    snmpVersion: "2c"
+    community: "public"
+    pollIntervalSec: 4
+    profile: rfc1628-ups
+    nominalVoltage: 120
+    capacityWatts: 1500
+    outlets:
+      - index: 1
+        name: "Switched Load Segment 1"
+        equipment: "PoE Surveillance Switch"
+        isCriticalLocked: false
+        rebootDelaySec: 10
+      - index: 2
+        name: "Switched Load Segment 2"
+        equipment: "Access Point Controllers"
+        isCriticalLocked: false
+        rebootDelaySec: 10

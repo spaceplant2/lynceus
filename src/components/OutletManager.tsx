@@ -45,7 +45,9 @@ export const OutletManager: React.FC<OutletManagerProps> = ({
     message: string;
   } | null>(null);
 
-  const devicesWithOutlets = telemetry.filter((d) => d.outlets && d.outlets.length > 0);
+  // Deduplicate telemetry by id so duplicate entries never contaminate the outlets view
+  const uniqueTelemetry = Array.from(new Map(telemetry.map((d) => [d.id, d])).values());
+  const devicesWithOutlets = uniqueTelemetry.filter((d) => Array.isArray(d.outlets) && d.outlets.length > 0);
   const activeDeviceList =
     deviceFilter === 'all'
       ? devicesWithOutlets

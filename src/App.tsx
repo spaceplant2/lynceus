@@ -40,7 +40,15 @@ export default function App() {
           try {
             const telData = await telResult.value.json();
             if (telData && Array.isArray(telData.telemetry)) {
-              setTelemetry(telData.telemetry);
+              const seen = new Set<string>();
+              const uniqueTel: DeviceTelemetry[] = [];
+              for (const item of telData.telemetry) {
+                if (item && item.id && !seen.has(item.id)) {
+                  seen.add(item.id);
+                  uniqueTel.push(item);
+                }
+              }
+              setTelemetry(uniqueTel);
             }
           } catch {
             // Ignore parse errors from transient payloads

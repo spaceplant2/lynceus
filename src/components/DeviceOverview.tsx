@@ -32,24 +32,27 @@ export const DeviceOverview: React.FC<DeviceOverviewProps> = ({
 }) => {
   const { theme, mode } = useTheme();
 
-  // Compute aggregate stats across devices
-  const upsDevices = telemetry.filter((d) => d.type === 'ups');
-  const pduDevices = telemetry.filter((d) => d.type === 'pdu');
+  // Deduplicate telemetry by id to guarantee unique device rendering and accurate aggregates
+  const uniqueDevices = Array.from(new Map(telemetry.map((d) => [d.id, d])).values());
 
-  const totalPowerWatts = telemetry.reduce((sum, d) => sum + (d.outputPowerWatts || 0), 0);
+  // Compute aggregate stats across devices
+  const upsDevices = uniqueDevices.filter((d) => d.type === 'ups');
+  const pduDevices = uniqueDevices.filter((d) => d.type === 'pdu');
+
+  const totalPowerWatts = uniqueDevices.reduce((sum, d) => sum + (d.outputPowerWatts || 0), 0);
   const totalPowerKw = (totalPowerWatts / 1000).toFixed(2);
 
-  const avgInputVolt = telemetry.length
-    ? (telemetry.reduce((sum, d) => sum + d.inputVoltage, 0) / telemetry.length).toFixed(1)
+  const avgInputVolt = uniqueDevices.length
+    ? (uniqueDevices.reduce((sum, d) => sum + d.inputVoltage, 0) / uniqueDevices.length).toFixed(1)
     : '120.0';
 
   const minBatteryRuntime = upsDevices.length
     ? Math.min(...upsDevices.map((d) => d.runtimeRemainingMin ?? 999))
     : null;
 
-  const totalOutlets = telemetry.reduce((sum, d) => sum + d.outlets.length, 0);
-  const activeOutlets = telemetry.reduce(
-    (sum, d) => sum + d.outlets.filter((o) => o.state === 'on').length,
+  const totalOutlets = uniqueDevices.reduce((sum, d) => sum + (d.outlets?.length || 0), 0);
+  const activeOutlets = uniqueDevices.reduce(
+    (sum, d) => sum + (d.outlets || []).filter((o) => o.state === 'on').length,
     0
   );
 
@@ -96,7 +99,7 @@ export const DeviceOverview: React.FC<DeviceOverviewProps> = ({
         <div>
           <h2 className="text-base font-semibold theme-text-main tracking-tight">Monitored Infrastructure</h2>
           <div className="text-xs theme-text-muted mt-0.5 flex items-center gap-2 font-mono">
-            <span>{telemetry.length} Devices Registered</span>
+            <span>{uniqueDevices.length} Devices Registered</span>
             <span aria-hidden="true" className="theme-text-dim">·</span>
             <span>Polling UDP:161</span>
             <span aria-hidden="true" className="theme-text-dim">·</span>
@@ -107,7 +110,7 @@ export const DeviceOverview: React.FC<DeviceOverviewProps> = ({
 
       {/* 3. Device Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {telemetry.map((dev) => {
+        {uniqueDevices.map((dev) => {
           const isUPS = dev.type === 'ups';
           const isOverload = dev.outputLoadPct >= 80;
           const isOnBattery = dev.state === 'on_battery';

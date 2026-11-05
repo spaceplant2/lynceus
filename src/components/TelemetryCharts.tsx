@@ -9,12 +9,13 @@ interface TelemetryChartsProps {
 
 export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({ telemetry }) => {
   const { theme, mode } = useTheme();
+  const uniqueTelemetry = Array.from(new Map(telemetry.map((d) => [d.id, d])).values());
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(
-    telemetry[0]?.id || ''
+    uniqueTelemetry[0]?.id || ''
   );
   const [selectedMetric, setSelectedMetric] = useState<'load' | 'voltage' | 'battery' | 'current'>('load');
 
-  const activeDevice = telemetry.find((d) => d.id === selectedDeviceId) || telemetry[0];
+  const activeDevice = uniqueTelemetry.find((d) => d.id === selectedDeviceId) || uniqueTelemetry[0];
 
   if (!activeDevice) {
     return (
@@ -139,7 +140,7 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({ telemetry }) =
             onChange={(e) => setSelectedDeviceId(e.target.value)}
             className="theme-input border rounded px-2.5 py-1.5 text-xs font-mono focus:outline-none cursor-pointer"
           >
-            {telemetry.map((d) => (
+            {uniqueTelemetry.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name} ({d.type.toUpperCase()})
               </option>

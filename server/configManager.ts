@@ -285,6 +285,42 @@ devices:
       const profilesParsed = yaml.load(profilesRaw) as { profiles?: OidProfile[] };
       const devicesParsed = yaml.load(devicesRaw) as { devices?: DeviceConfig[] };
 
+      const rawDevices = Array.isArray(devicesParsed?.devices) ? devicesParsed.devices : [];
+      // Deduplicate devices by unique id and sanitize outlet arrays
+      const seenIds = new Set<string>();
+      const sanitizedDevices: DeviceConfig[] = [];
+
+      for (let i = 0; i < rawDevices.length; i++) {
+        const d = rawDevices[i];
+        if (!d || typeof d !== 'object') continue;
+        const id = String(d.id || `device-${i + 1}`).trim();
+        if (seenIds.has(id)) {
+          console.warn(`[ConfigManager] Skipping duplicate device id "${id}" at position ${i + 1}`);
+          continue;
+        }
+        seenIds.add(id);
+
+        sanitizedDevices.push({
+          ...d,
+          id,
+          name: d.name ? String(d.name).trim() : id,
+          type: d.type === 'pdu' ? 'pdu' : 'ups',
+          host: d.host ? String(d.host).trim() : '127.0.0.1',
+          port: Number(d.port) || 161,
+          snmpVersion: (d.snmpVersion === '1' || d.snmpVersion === '3') ? d.snmpVersion : '2c',
+          profile: d.profile ? String(d.profile).trim() : (d.type === 'pdu' ? 'apc-switched-pdu' : 'apc-powernet-ups'),
+          outlets: Array.isArray(d.outlets)
+            ? d.outlets.map((o, oIdx) => ({
+                index: Number(o.index) || oIdx + 1,
+                name: o.name ? String(o.name).trim() : `Outlet #${o.index || oIdx + 1}`,
+                equipment: o.equipment ? String(o.equipment).trim() : undefined,
+                isCriticalLocked: Boolean(o.isCriticalLocked),
+                rebootDelaySec: Number(o.rebootDelaySec) || 10,
+              }))
+            : [],
+        });
+      }
+
       const config: AppConfig = {
         version: 1,
         settings: {
@@ -302,7 +338,7 @@ devices:
           allowLabSimulationFallback: settingsParsed?.settings?.allowLabSimulationFallback ?? true,
         },
         profiles: profilesParsed?.profiles || [],
-        devices: devicesParsed?.devices || [],
+        devices: sanitizedDevices,
       };
 
       this.cachedConfig = config;
